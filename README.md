@@ -55,7 +55,7 @@ Currently in active development. See [CHANGELOG.md](CHANGELOG.md) for version hi
 
 ## License
 
-Copyright 2026 [Your Name]. All rights reserved.
+Copyright 2026 Edison Mooers (edisonmooers.com). All rights reserved.
 
 This source is made available for review and educational reference only.
 Use, modification, or distribution requires written permission.
