@@ -1,0 +1,413 @@
+// QF CODE v1 — Dragon's Keep
+// A micro text adventure that showcases the QF CODE language.
+// By QuibbleFox | quibblefox.com
+
+CONST GAME_TITLE  = "Dragon's Keep"
+CONST VERSION     = "1.0"
+CONST MAX_HEALTH  = 100
+CONST MAX_ITEMS   = 6
+
+VAR player_name   = ""
+VAR health        = MAX_HEALTH
+VAR gold          = 10
+VAR score         = 0
+VAR turns         = 0
+VAR inventory     = ARRAY()
+VAR game_over     = FALSE
+
+FUNCTION Banner(text)
+    VAR line = ""
+    FOR i = 1 TO LENGTH(text) + 4
+        line = line + "="
+    END FOR
+    PRINT("")
+    PRINT("+" + line + "+")
+    PRINT("|  " + text + "  |")
+    PRINT("+" + line + "+")
+END FUNCTION
+
+FUNCTION Divider()
+    PRINT("  --------------------------------")
+END FUNCTION
+
+FUNCTION Clamp(value, lo, hi)
+    IF value < lo THEN
+        RETURN lo
+    END IF
+    IF value > hi THEN
+        RETURN hi
+    END IF
+    RETURN value
+END FUNCTION
+
+FUNCTION HasItem(item)
+    RETURN CONTAINS(inventory, item)
+END FUNCTION
+
+FUNCTION GiveItem(item)
+    IF LENGTH(inventory) >= MAX_ITEMS THEN
+        PRINT("  Your pack is full!")
+        RETURN FALSE
+    END IF
+    APPEND(inventory, item)
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION TakeItem(item)
+    FOR i = 0 TO LENGTH(inventory) - 1
+        IF inventory[i] == item THEN
+            REMOVE(inventory, i)
+            RETURN TRUE
+        END IF
+    END FOR
+    RETURN FALSE
+END FUNCTION
+
+FUNCTION ShowStatus()
+    Divider()
+    PRINT("  " + player_name + "  HP: " + health + "/" + MAX_HEALTH + "   Gold: " + gold + "   Score: " + score)
+    IF LENGTH(inventory) > 0 THEN
+        VAR inv_str = "  Pack: "
+        FOR EACH item IN inventory
+            inv_str = inv_str + "[" + item + "] "
+        END FOR
+        PRINT(inv_str)
+    ELSE
+        PRINT("  Pack: (empty)")
+    END IF
+    Divider()
+END FUNCTION
+
+FUNCTION Heal(amount)
+    VAR old_hp = health
+    health = Clamp(health + amount, 0, MAX_HEALTH)
+    VAR gained = health - old_hp
+    PRINT("  You recover " + gained + " health.")
+END FUNCTION
+
+FUNCTION TakeDamage(amount)
+    health = Clamp(health - amount, 0, MAX_HEALTH)
+    PRINT("  You take " + amount + " damage! (" + health + "/" + MAX_HEALTH + " HP)")
+    IF health == 0 THEN
+        game_over = TRUE
+    END IF
+END FUNCTION
+
+FUNCTION RollDice(sides)
+    RETURN RANDOMINT(1, sides)
+END FUNCTION
+
+FUNCTION Combat(enemy_name, enemy_hp, enemy_attack, enemy_defense, xp)
+    Banner("COMBAT: " + UPPER(enemy_name))
+    PRINT("  A " + enemy_name + " appears! HP: " + enemy_hp)
+    PRINT("")
+
+    VAR current_hp = enemy_hp
+    VAR battle_round = 1
+
+    WHILE current_hp > 0 AND health > 0
+        PRINT("  Round " + battle_round + "  --  " + enemy_name + " HP: " + current_hp)
+        PRINT("  [A]ttack   [S]trike hard (+risk)   [R]un")
+        VAR choice = LOWER(TRIM(INPUT("  > ")))
+
+        MATCH choice
+            WHEN "a"
+                VAR hit = RollDice(20)
+                IF hit > enemy_defense THEN
+                    VAR dmg = RollDice(8) + 2
+                    current_hp = current_hp - dmg
+                    PRINT("  You hit for " + dmg + " damage!")
+                ELSE
+                    PRINT("  Your attack glances off.")
+                END IF
+            WHEN "s"
+                VAR risk_roll = RollDice(6)
+                IF risk_roll >= 4 THEN
+                    VAR big_dmg = RollDice(12) + 6
+                    current_hp = current_hp - big_dmg
+                    PRINT("  CRITICAL STRIKE! " + big_dmg + " damage!")
+                ELSE
+                    PRINT("  You overextend and stumble!")
+                    TakeDamage(RollDice(4))
+                END IF
+            WHEN "r"
+                IF RollDice(6) >= 4 THEN
+                    PRINT("  You escape!")
+                    RETURN FALSE
+                ELSE
+                    PRINT("  Can't get away!")
+                END IF
+            WHEN ELSE
+                PRINT("  Unknown command. Try A, S, or R.")
+        END MATCH
+
+        IF current_hp > 0 AND health > 0 THEN
+            VAR enemy_hit = RollDice(20)
+            IF enemy_hit > 10 THEN
+                TakeDamage(RollDice(enemy_attack))
+            ELSE
+                PRINT("  The " + enemy_name + " misses you!")
+            END IF
+        END IF
+
+        IF game_over THEN
+            RETURN FALSE
+        END IF
+
+        battle_round = battle_round + 1
+    END WHILE
+
+    IF current_hp <= 0 THEN
+        PRINT("")
+        PRINT("  You defeated the " + enemy_name + "!")
+        score = score + xp
+        PRINT("  +" + xp + " XP  (Score: " + score + ")")
+        RETURN TRUE
+    END IF
+
+    RETURN FALSE
+END FUNCTION
+
+FUNCTION Room_Entrance()
+    Banner("THE ENTRANCE HALL")
+    PRINT("  Crumbling stone archways rise into darkness.")
+    PRINT("  Torchlight flickers. Three paths lead onward.")
+    PRINT("")
+    PRINT("  [1] The merchant's alcove")
+    PRINT("  [2] The crypt corridor")
+    PRINT("  [3] Push deeper -- the great hall")
+    PRINT("  [I] Check inventory and status")
+    PRINT("  [Q] Quit and tally your score")
+    PRINT("")
+
+    WHILE TRUE
+        VAR choice = LOWER(TRIM(INPUT("  Where do you go? > ")))
+
+        MATCH choice
+            WHEN "1"
+                Room_Merchant()
+                RETURN
+            WHEN "2"
+                Room_Crypt()
+                RETURN
+            WHEN "3"
+                Room_GreatHall()
+                RETURN
+            WHEN "i"
+                ShowStatus()
+            WHEN "q"
+                PRINT("  You sheathe your sword and walk back into daylight.")
+                game_over = TRUE
+                RETURN
+            WHEN ELSE
+                PRINT("  Try 1, 2, 3, I, or Q.")
+        END MATCH
+    END WHILE
+END FUNCTION
+
+FUNCTION Room_Merchant()
+    Banner("MERCHANT'S ALCOVE")
+    PRINT("  A hooded figure sits behind a cluttered table.")
+    PRINT("  Adventurer. I have wares -- if you have coin.")
+    PRINT("")
+    PRINT("  [1] Healing Potion  (30 gold) -- restores 40 HP")
+    PRINT("  [2] Iron Shield     (50 gold) -- reduces damage taken")
+    PRINT("  [3] Lockpick        (20 gold) -- opens sealed doors")
+    PRINT("  [4] Leave")
+    PRINT("")
+
+    WHILE TRUE
+        PRINT("  Gold: " + gold)
+        VAR choice = TRIM(INPUT("  Buy what? > "))
+
+        MATCH choice
+            WHEN "1"
+                IF gold >= 30 THEN
+                    IF GiveItem("Potion") THEN
+                        gold = gold - 30
+                        PRINT("  Potion acquired.")
+                    END IF
+                ELSE
+                    PRINT("  Not enough gold.")
+                END IF
+            WHEN "2"
+                IF gold >= 50 THEN
+                    IF NOT HasItem("Shield") THEN
+                        IF GiveItem("Shield") THEN
+                            gold = gold - 50
+                            PRINT("  Iron Shield acquired.")
+                        END IF
+                    ELSE
+                        PRINT("  You already carry a shield.")
+                    END IF
+                ELSE
+                    PRINT("  Not enough gold.")
+                END IF
+            WHEN "3"
+                IF gold >= 20 THEN
+                    IF GiveItem("Lockpick") THEN
+                        gold = gold - 20
+                        PRINT("  Lockpick acquired.")
+                    END IF
+                ELSE
+                    PRINT("  Not enough gold.")
+                END IF
+            WHEN "4"
+                PRINT("  Safe travels, the merchant murmurs.")
+                RETURN
+            WHEN ELSE
+                PRINT("  Try 1, 2, 3, or 4.")
+        END MATCH
+    END WHILE
+END FUNCTION
+
+FUNCTION Room_Crypt()
+    Banner("THE CRYPT CORRIDOR")
+    PRINT("  The air is cold and smells of old stone.")
+    PRINT("  Bones line the walls. Something moves.")
+    PRINT("")
+
+    VAR won = Combat("skeleton warrior", 18, 4, 8, 25)
+
+    IF game_over THEN
+        RETURN
+    END IF
+
+    IF won THEN
+        PRINT("")
+        PRINT("  Searching the crypt, you find a locked iron chest.")
+        IF HasItem("Lockpick") THEN
+            PRINT("  You use your lockpick -- click! It opens.")
+            TakeItem("Lockpick")
+            gold = gold + 40
+            PRINT("  Found 40 gold!")
+            score = score + 15
+        ELSE
+            PRINT("  It's locked. You'd need a lockpick to open it.")
+        END IF
+    END IF
+
+    PRINT("")
+    PRINT("  You return to the entrance hall.")
+END FUNCTION
+
+FUNCTION Room_GreatHall()
+    Banner("THE GREAT HALL")
+    PRINT("  Massive columns. A cracked throne. And beyond it --")
+    PRINT("  the dragon, Vorrakh, asleep on a mound of gold.")
+    PRINT("")
+
+    IF health < 40 THEN
+        PRINT("  You are too wounded to face the dragon.")
+        PRINT("  Wisely, you retreat to heal first.")
+        RETURN
+    END IF
+
+    PRINT("  This is the final battle. No turning back.")
+    VAR confirm = LOWER(TRIM(INPUT("  Face Vorrakh? (yes/no) > ")))
+
+    IF confirm != "yes" THEN
+        PRINT("  You retreat, courage failing you -- for now.")
+        RETURN
+    END IF
+
+    VAR dragon_attack = 8
+    IF HasItem("Shield") THEN
+        dragon_attack = 5
+        PRINT("  Your shield steadies your nerves. Dragon attack reduced!")
+    END IF
+
+    IF HasItem("Potion") AND health < 60 THEN
+        PRINT("  You drink your Healing Potion before battle!")
+        TakeItem("Potion")
+        Heal(40)
+    END IF
+
+    VAR won = Combat("Vorrakh the Ancient", 60, dragon_attack, 12, 200)
+
+    IF won THEN
+        Banner("VICTORY")
+        PRINT("  Vorrakh falls. The keep shakes. Gold and jewels")
+        PRINT("  cascade from the shattered throne.")
+        PRINT("")
+        gold = gold + 300
+        score = score + 100
+        PRINT("  You claim 300 gold from the dragon's hoard!")
+        game_over = TRUE
+    END IF
+END FUNCTION
+
+FUNCTION ScoreRating(s)
+    MATCH s
+        WHEN 0 TO 49
+            RETURN "Peasant"
+        WHEN 50 TO 149
+            RETURN "Adventurer"
+        WHEN 150 TO 299
+            RETURN "Hero"
+        WHEN 300 TO 499
+            RETURN "Champion"
+        WHEN ELSE
+            RETURN "Legend"
+    END MATCH
+END FUNCTION
+
+ERASE()
+Banner(GAME_TITLE + " -- QF CODE Demo")
+PRINT("")
+PRINT("  A micro text adventure showcasing QF CODE v1.")
+PRINT("  Combat, inventory, shops, branching rooms.")
+PRINT("")
+
+player_name = TRIM(INPUT("  Enter your name, adventurer: "))
+IF LENGTH(player_name) == 0 THEN
+    player_name = "Stranger"
+END IF
+
+PRINT("")
+PRINT("  Welcome, " + player_name + ". The keep awaits.")
+PRINT("  You begin with " + gold + " gold and full health.")
+PRINT("")
+PRINT("  TIP: Buy a Lockpick before the crypt.")
+PRINT("       Buy a Potion before the great hall.")
+
+WHILE NOT game_over
+    turns = turns + 1
+
+    IF turns > 1 THEN
+        ShowStatus()
+    END IF
+
+    IF health <= 0 THEN
+        game_over = TRUE
+    ELSE
+        Room_Entrance()
+    END IF
+END WHILE
+
+Banner("GAME OVER")
+PRINT("")
+
+IF health <= 0 THEN
+    PRINT("  " + player_name + " has fallen in the keep.")
+    PRINT("  The dragon sleeps on, undisturbed.")
+ELSE
+    PRINT("  " + player_name + " emerges victorious!")
+    PRINT("  The bards will sing of this day.")
+END IF
+
+PRINT("")
+
+VAR final_score = score + gold + (health * 2)
+VAR rating = ScoreRating(final_score)
+
+PRINT("  -- Final Results --")
+PRINT("  Combat score : " + score)
+PRINT("  Gold carried : " + gold)
+PRINT("  Health bonus : " + (health * 2))
+PRINT("  -------------------")
+PRINT("  FINAL SCORE  : " + final_score)
+PRINT("  RATING       : " + rating)
+PRINT("")
+PRINT("  Thanks for playing " + GAME_TITLE + "!")
+PRINT("  Built with QF CODE -- quibblefox.com")
