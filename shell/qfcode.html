@@ -592,7 +592,7 @@ const SINGLE_KEYWORDS = new Set([
   'ATTEMPT', 'ERROR', 'SIGNAL',
   'TRUE', 'FALSE', 'EMPTY',
   'AND', 'OR', 'NOT', 'XOR',
-  'PRINT', 'INPUT', 'ERASE', 'STOP',
+  'WRITE', 'WRITELN', 'INPUT', 'ERASE', 'STOP',
   'STR', 'NUM', 'BOOL',
   'LENGTH', 'APPEND', 'REMOVE', 'INSERT', 'CONTAINS', 'REVERSE', 'SORT',
   'ABS', 'POW', 'ROUND', 'FLOOR', 'CEILING', 'SQRT', 'MIN', 'MAX',
@@ -854,35 +854,81 @@ function tokenize(source) {
     //
     // This maps cleanly to user expectations:
     //   // comment at line start       → comment
-    //   PRINT("x") // inline comment   → comment (PRINT closes expression; // starts comment)
+    //   WRITELN("x") // inline comment → comment (WRITELN closes expression; // starts comment)
     //   7 // 2                         → integer division (7 is a meaningful token)
     //   a // b                         → integer division (a is a meaningful token)
     //
-    // Inline comment after a closing ) or ] or identifier: the ) / ] closes the
-    // expression and the // is then at a "comment-start" position — but meaningfulOnLine
-    // is true. We resolve by also checking if the char immediately after // is a space
-    // AND looking at whether the prior token was a "closing" token (IDENTIFIER, NUMBER,
-    // STRING, or closing bracket). If meaningful AND immediately after // is a space,
-    // we need to distinguish division from comment.
-    //
     // FINAL RULE: // is a COMMENT when:
     //   (a) !meaningfulOnLine (line start comment), OR
-    //   (b) meaningfulOnLine AND the // is followed by end-of-line / EOF /
-    //       or the text that follows cannot be a valid numeric/identifier operand
-    //       (we check: after stripping spaces, is there a number or identifier? if yes,
-    //        it MIGHT be division — but if the prior closing token was ) ] STRING,
-    //        then it's more likely a comment. We use a simple heuristic: if the last
-    //        meaningful token was ) or ] or a STRING, treat // as a comment).
+    //   (b) last meaningful token was a STRING, NUMBER, IDENTIFIER, ')', or ']'
+    //       (i.e. the // follows a completed value/expression, not a mid-expression operand)
     //
-    // This handles the common cases correctly. Edge case (x) // y — ambiguous in the
-    // spec; we emit it as a comment, which is more beginner-friendly.
+    // This correctly handles RETURN 42 // comment, foo() // comment, x // y (division), etc.
     if (ch === '/' && peek(1) === '/') {
       const lastTok = tokens[tokens.length - 1];
-      const lastIsClosingOrValue = lastTok && (
-        lastTok.type === 'STRING' ||
-        (lastTok.type === 'OPERATOR' && (lastTok.value === ')' || lastTok.value === ']'))
-      );
-      const isComment = !meaningfulOnLine || lastIsClosingOrValue;
+      let isComment;
+
+      if (!meaningfulOnLine) {
+        // Nothing meaningful on line yet → always a comment
+        isComment = true;
+      } else if (!lastTok || lastTok.type === 'STRING' || lastTok.type === 'KEYWORD') {
+        // After a string or a keyword (TRUE/FALSE/EMPTY/etc.) → comment
+        isComment = true;
+      } else if (lastTok.type === 'OPERATOR' &&
+                 (lastTok.value === ')' || lastTok.value === ']')) {
+        // After a closing bracket → comment
+        isComment = true;
+      } else {
+        // Last token was NUMBER or IDENTIFIER — peek past // to decide.
+        let p = pos + 2;
+        while (p < source.length && (source[p] === ' ' || source[p] === '\t')) p++;
+        const nc = source[p];
+
+        if (nc === undefined || nc === '\n') {
+          isComment = true;  // nothing follows // → comment
+        } else if ((nc >= '0' && nc <= '9') || nc === '-' || nc === '(') {
+          // Digit, unary minus, or open-paren → clearly a division operand
+          isComment = false;
+        } else if ((nc >= 'a' && nc <= 'z') || (nc >= 'A' && nc <= 'Z') || nc === '_') {
+          // Read the word that follows //
+          let word = '', q = p;
+          while (q < source.length && (
+            (source[q] >= 'a' && source[q] <= 'z') ||
+            (source[q] >= 'A' && source[q] <= 'Z') ||
+            (source[q] >= '0' && source[q] <= '9') || source[q] === '_')) {
+            word += source[q++];
+          }
+          const upper = word.toUpperCase();
+
+          if (lastTok.type === 'NUMBER') {
+            // After a number literal: // is comment if followed by a word.
+            // "RETURN 42 // note" and "VAR x = 10 // init" are comments.
+            // Trade-off: "42 // myVar" is treated as comment (rare; users can write (42) // y).
+            isComment = true;
+          } else {
+            // After an IDENTIFIER: "x // y" is division; "x // THIS" is a comment.
+            if (!SINGLE_KEYWORDS.has(upper)) {
+              isComment = false; // plain identifier → x // y → division
+            } else {
+              const EXPR_START_KW = new Set([
+                'TRUE', 'FALSE', 'EMPTY', 'NOT',
+                'STR', 'NUM', 'BOOL',
+                'LENGTH', 'APPEND', 'REMOVE', 'INSERT', 'CONTAINS', 'REVERSE', 'SORT',
+                'ABS', 'POW', 'ROUND', 'FLOOR', 'CEILING', 'SQRT', 'MIN', 'MAX',
+                'RANDOM', 'RANDOMINT',
+                'UPPER', 'LOWER', 'TRIM', 'REPLACE', 'SPLIT', 'SUBSTRING',
+                'STARTSWITH', 'ENDSWITH',
+                'ISNUMBER', 'ISSTRING', 'ISBOOL', 'ISEMPTY', 'ISARRAY', 'ARRAY',
+                'INPUT', 'WRITE', 'WRITELN', 'LAST_ERROR',
+              ]);
+              isComment = !EXPR_START_KW.has(upper);
+            }
+          }
+        } else {
+          isComment = true; // any other character after // → comment
+        }
+      }
+
       if (isComment) {
         advance(); advance();
         skipLineComment();
@@ -1127,7 +1173,8 @@ class Parser {
         case 'RETURN':    return this.parseReturn();
         case 'BREAK':     return this.parseBreak();
         case 'CONTINUE':  return this.parseContinue();
-        case 'PRINT':     return this.parsePrint();
+        case 'WRITE':     return this.parseWrite();
+        case 'WRITELN':   return this.parseWrite();
         case 'ERASE':     return this.parseErase();
         case 'STOP':      return this.parseStop();
         case 'SIGNAL':    return this.parseSignal();
@@ -1390,6 +1437,13 @@ class Parser {
     if (this.current().type !== 'NEWLINE' && this.current().type !== 'EOF') {
       value = this.parseExpression();
     }
+    // Skip any trailing comment tokens that the lexer may have left as operators
+    // (e.g. `RETURN 42  // comment` — after parsing 42, the // may tokenize as
+    // integer-division operator if the lexer's heuristic didn't catch it).
+    // Discard everything until we reach a NEWLINE or EOF.
+    while (this.current().type !== 'NEWLINE' && this.current().type !== 'EOF') {
+      this.advance();
+    }
     this.expectNewlineOrEOF();
     return this.node('ReturnStmt', { value }, startTok);
   }
@@ -1408,10 +1462,11 @@ class Parser {
     return this.node('ContinueStmt', {}, tok);
   }
 
-  // ── PRINT ──────────────────────────────────────────────────────────────
+  // ── WRITE / WRITELN ────────────────────────────────────────────────────
 
-  parsePrint() {
-    const startTok = this.advance(); // consume PRINT
+  parseWrite() {
+    const startTok = this.advance(); // consume WRITE or WRITELN
+    const newline = startTok.value === 'WRITELN';
     this.expectOperator('(');
     const args = [];
     if (!this.isOperator(')')) {
@@ -1423,7 +1478,7 @@ class Parser {
     }
     this.expectOperator(')');
     this.expectNewlineOrEOF();
-    return this.node('PrintStmt', { args }, startTok);
+    return this.node('PrintStmt', { args, newline }, startTok);
   }
 
   // ── ERASE ──────────────────────────────────────────────────────────────
@@ -1727,7 +1782,7 @@ class Parser {
   // All built-in keywords that take () args and return values
   isBuiltinFunction(kw) {
     return [
-      'PRINT', 'INPUT', 'ERASE', 'STOP', 'SIGNAL',
+      'WRITE', 'WRITELN', 'INPUT', 'ERASE', 'STOP', 'SIGNAL',
       'STR', 'NUM', 'BOOL',
       'LENGTH', 'APPEND', 'REMOVE', 'INSERT', 'CONTAINS', 'REVERSE', 'SORT',
       'ABS', 'POW', 'ROUND', 'FLOOR', 'CEILING', 'SQRT', 'MIN', 'MAX',
@@ -1989,7 +2044,7 @@ class Evaluator {
     }
   }
 
-  // ── PRINT ──────────────────────────────────────────────────────────────────
+  // ── WRITE / WRITELN ────────────────────────────────────────────────────────
 
   async execPrint(node, env) {
     const parts = [];
@@ -1997,7 +2052,13 @@ class Evaluator {
       const v = await this.evalExpr(arg, env);
       parts.push(displayValue(v));
     }
-    this.io.print(parts.join(' '));
+    // node.newline === true  → WRITELN: append newline (default io.print behaviour)
+    // node.newline === false → WRITE:   no newline, append to current line
+    if (node.newline === false) {
+      this.io.write(parts.join(' '));
+    } else {
+      this.io.print(parts.join(' '));
+    }
   }
 
   // ── ERASE ──────────────────────────────────────────────────────────────────
@@ -2492,7 +2553,7 @@ class Evaluator {
   // ── STOP special handling ─────────────────────────────────────────────────
 
   // STOP() is handled as a statement; if it appears as an expression
-  // (e.g. inside a PRINT) we handle it here.
+  // (e.g. inside a WRITELN) we handle it here.
   // We throw a special StopSignal that halts the program.
 
   // ── Built-in functions ────────────────────────────────────────────────────
@@ -2515,9 +2576,15 @@ class Evaluator {
 
       // ── I/O ─────────────────────────────────────────────────────────────
 
-      case 'PRINT': {
+      case 'WRITELN': {
         const vals = await evalArgs();
         this.io.print(vals.map(displayValue).join(' '));
+        return EMPTY;
+      }
+
+      case 'WRITE': {
+        const vals = await evalArgs();
+        this.io.write(vals.map(displayValue).join(' '));
         return EMPTY;
       }
 
@@ -2816,7 +2883,7 @@ const KEYWORDS_SET = new Set([
 const BOOL_EMPTY = new Set(['TRUE','FALSE','EMPTY']);
 
 const BUILTINS_SET = new Set([
-  'PRINT','INPUT','ERASE','STOP','STR','NUM','BOOL',
+  'WRITE','WRITELN','INPUT','ERASE','STOP','STR','NUM','BOOL',
   'LENGTH','APPEND','REMOVE','INSERT','CONTAINS','REVERSE','SORT',
   'ABS','POW','ROUND','FLOOR','CEILING','SQRT','MIN','MAX','RANDOM','RANDOMINT',
   'UPPER','LOWER','TRIM','REPLACE','SPLIT','SUBSTRING','STARTSWITH','ENDSWITH',
@@ -2902,30 +2969,30 @@ const uppercaseKeywords = EditorView.updateListener.of(update => {
 
 const STARTER = `// QF CODE v1 — Welcome to QuibbleFox!
 
-PRINT("What's your name?")
+WRITELN("What's your name?")
 VAR name = INPUT("Name: ")
-PRINT("Hello,", name, "— let's code!")
+WRITELN("Hello,", name, "— let's code!")
 
 VAR count = 1
 WHILE count <= 5
-  PRINT(count, "...")
+  WRITELN(count, "...")
   count = count + 1
 END WHILE
 
-PRINT("Ready to go!")
+WRITELN("Ready to go!")
 `;
 
 const EXAMPLE = `// QF CODE v1 — FizzBuzz
 
 FOR i = 1 TO 20
   IF i % 15 == 0 THEN
-    PRINT("FizzBuzz")
+    WRITELN("FizzBuzz")
   ELSE IF i % 3 == 0 THEN
-    PRINT("Fizz")
+    WRITELN("Fizz")
   ELSE IF i % 5 == 0 THEN
-    PRINT("Buzz")
+    WRITELN("Buzz")
   ELSE
-    PRINT(i)
+    WRITELN(i)
   END IF
 END FOR
 `;
@@ -2972,6 +3039,7 @@ function updateCursorPos(state) {
 const outputHost = document.getElementById('output-host');
 const outputEmpty = document.getElementById('output-empty');
 let lineCount = 0;
+let currentWriteLine = null;  // tracks the active WRITE line (null when last call was WRITELN)
 
 function showEmpty(show) {
   outputEmpty.style.display = show ? 'flex' : 'none';
@@ -2982,11 +3050,39 @@ function clearOutput() {
   const toRemove = [...outputHost.children].filter(el => el !== outputEmpty);
   toRemove.forEach(el => el.remove());
   lineCount = 0;
+  currentWriteLine = null;
   showEmpty(true);
 }
 
+// WRITE() — append text to the current line (no newline).
+// If no current line exists, start a new one.
+function appendOutputText(text) {
+  showEmpty(false);
+  if (!currentWriteLine) {
+    lineCount++;
+    const row = document.createElement('div');
+    row.className = 'output-line';
+    const gutter = document.createElement('span');
+    gutter.className = 'output-gutter';
+    gutter.textContent = lineCount;
+    const content = document.createElement('span');
+    content.className = 'output-text';
+    content.textContent = text;
+    row.appendChild(gutter);
+    row.appendChild(content);
+    outputHost.appendChild(row);
+    outputHost.scrollTop = outputHost.scrollHeight;
+    currentWriteLine = content;
+  } else {
+    currentWriteLine.textContent += text;
+    outputHost.scrollTop = outputHost.scrollHeight;
+  }
+}
+
+// WRITELN() — append text as a new complete line.
 function appendOutputLine(text, cls = '') {
   showEmpty(false);
+  currentWriteLine = null;  // WRITELN always completes the current line
   lineCount++;
   const row = document.createElement('div');
   row.className = 'output-line' + (cls ? ' ' + cls : '');
@@ -3115,10 +3211,12 @@ async function runProgram() {
 
   const io = {
     print: (text) => appendOutputLine(text),
+    write: (text) => appendOutputText(text),
     erase: ()     => {
       const toRemove = [...outputHost.children].filter(el => el !== outputEmpty);
       toRemove.forEach(el => el.remove());
       lineCount = 0;
+      currentWriteLine = null;
     },
     input: (prompt) => requestInput(prompt),
   };
