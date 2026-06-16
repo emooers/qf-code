@@ -27,10 +27,11 @@ Open the shell and start writing.
 ## Language Quick Look
 
     VAR name = INPUT("What is your name? ")
-    PRINT "Hello, " + name + "!"
+    WRITE "Hello, " + name + "!"
 
     FOR i = 1 TO 5
-        PRINT i + ": " + name
+        WRITE i + ": " + name
+        WRITELN
     END FOR
 
 ---
