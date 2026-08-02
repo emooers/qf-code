@@ -183,6 +183,17 @@ html, body {
   color: var(--text);
 }
 
+.filename-label {
+  font-family: var(--font-code);
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-left: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+
 .btn-icon {
   padding: 0 10px;
   font-size: 15px;
@@ -192,6 +203,23 @@ html, body {
 }
 
 .btn-icon:hover { color: var(--text); background: var(--border); }
+
+.btn-icon:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.btn-icon:disabled:hover { color: var(--text-muted); background: var(--surface2); }
+
+.btn-icon-svg {
+  width: 32px;
+  padding: 0;
+  justify-content: center;
+}
+.btn-icon-svg svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
 
 /* ── Panels ──────────────────────────────────────────────────────── */
 #panels {
@@ -272,6 +300,107 @@ html, body {
 
 .cm-selectionBackground,
 .cm-content ::selection { background: rgba(56,189,248,0.15) !important; }
+
+/* Autocomplete tooltip — matched to the editor's dark theme */
+.cm-tooltip-autocomplete {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+  font-family: var(--font-code) !important;
+  font-size: 13px !important;
+  overflow: hidden;
+}
+.cm-tooltip-autocomplete ul li {
+  color: var(--text) !important;
+  padding: 4px 8px !important;
+}
+.cm-tooltip-autocomplete ul li[aria-selected] {
+  background: var(--orange-dim) !important;
+  color: #fff !important;
+}
+.cm-completionIcon { display: none !important; } /* type-prefix text instead */
+.cm-completionLabel { color: inherit !important; }
+.cm-completionMatchedText { color: var(--orange) !important; text-decoration: none !important; }
+.cm-tooltip-autocomplete ul li[aria-selected] .cm-completionMatchedText { color: #fff !important; }
+.cm-completionDetail { color: var(--text-muted) !important; font-style: normal !important; margin-left: 8px; }
+
+/* Signature-help (parameter) tooltip */
+.cm-qf-signature-tooltip {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+  font-family: var(--font-code) !important;
+  font-size: 13px !important;
+  padding: 6px 10px;
+  max-width: 420px;
+}
+.cm-qf-sig-line { color: var(--text-muted); white-space: pre; }
+.cm-qf-sig-line strong { color: var(--orange); font-weight: 600; }
+.cm-qf-sig-note {
+  font-family: var(--font-ui) !important;
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+  white-space: normal;
+}
+.cm-qf-sig-warn { color: var(--red) !important; }
+
+/* Search & Replace panel — CodeMirror's built-in panel (@codemirror/search),
+   restyled to match the dark theme, same approach as the autocomplete
+   dropdown and signature tooltip above. DOM/classes confirmed against the
+   package source, not guessed. */
+.cm-panel.cm-search {
+  background: var(--surface) !important;
+  border-bottom: 1px solid var(--border) !important;
+  color: var(--text) !important;
+  font-family: var(--font-ui) !important;
+  font-size: 13px !important;
+  padding: 8px 36px 10px 10px !important;
+}
+.cm-panel.cm-search .cm-textfield {
+  background: var(--surface2) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+  color: var(--text) !important;
+  font-family: var(--font-code) !important;
+  font-size: 13px !important;
+  padding: 3px 8px !important;
+}
+.cm-panel.cm-search .cm-textfield:focus {
+  outline: none !important;
+  border-color: var(--orange) !important;
+}
+.cm-panel.cm-search .cm-button {
+  background: var(--surface2) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+  color: var(--text) !important;
+  font-family: var(--font-ui) !important;
+  font-size: 12px !important;
+  padding: 3px 10px !important;
+  cursor: pointer;
+}
+.cm-panel.cm-search .cm-button:hover {
+  background: var(--orange-dim) !important;
+  border-color: var(--orange) !important;
+}
+.cm-panel.cm-search label {
+  color: var(--text-muted) !important;
+}
+.cm-panel.cm-search input[type="checkbox"] {
+  accent-color: var(--orange);
+}
+.cm-panel.cm-search button[name="close"] {
+  color: var(--text-muted) !important;
+  font-size: 18px !important;
+  line-height: 1 !important;
+  cursor: pointer;
+}
+.cm-panel.cm-search button[name="close"]:hover {
+  color: var(--text) !important;
+}
 
 /* QF CODE syntax highlighting */
 .qf-keyword  { color: #C792EA; font-weight: 500; }
@@ -491,8 +620,66 @@ html, body {
 
     <div class="toolbar-sep"></div>
 
-    <button class="btn btn-secondary" id="btn-new" title="New program">New</button>
-    <button class="btn btn-secondary" id="btn-example" title="Load example">Example</button>
+    <button class="btn btn-icon btn-icon-svg" id="btn-new" title="New program">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 2.5h6l3 3v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1z"/>
+        <path d="M11 2.5v3h3"/>
+        <path d="M10 11v4M8 13h4"/>
+      </svg>
+    </button>
+    <button class="btn btn-icon btn-icon-svg" id="btn-open" title="Open a .qfc file from your computer">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 5.5A1.5 1.5 0 0 1 4.5 4h3.379a1.5 1.5 0 0 1 1.06.44l1.122 1.12A1.5 1.5 0 0 0 11.12 6H15.5A1.5 1.5 0 0 1 17 7.5v7A1.5 1.5 0 0 1 15.5 16h-11A1.5 1.5 0 0 1 3 14.5v-9z"/>
+      </svg>
+    </button>
+    <button class="btn btn-icon btn-icon-svg" id="btn-save" title="Save your code">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M16 16.5H4a1 1 0 0 1-1-1v-11a1 1 0 0 1 1-1h8.5L17 7v8.5a1 1 0 0 1-1 1z"/>
+        <path d="M12.5 16.5v-5H6v5"/>
+        <path d="M6 3.5v3.2h5.5"/>
+      </svg>
+    </button>
+    <button class="btn btn-icon btn-icon-svg" id="btn-save-as" title="Save as a new file">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M15 16.5H4a1 1 0 0 1-1-1v-11a1 1 0 0 1 1-1h7.5L16 7v3"/>
+        <path d="M11.5 16.5v-5H6v5"/>
+        <path d="M6 3.5v3.2h4.5"/>
+        <circle cx="15.5" cy="13.5" r="3" fill="var(--bg)" stroke="currentColor" stroke-width="1.3"/>
+        <path d="M15.5 12.1v2.8M14.1 13.5h2.8"/>
+      </svg>
+    </button>
+    <span id="current-filename" class="filename-label" title="Currently open file">untitled.qfc</span>
+
+    <div class="toolbar-sep"></div>
+
+    <button class="btn btn-icon btn-icon-svg" id="btn-example" title="Load example">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M10 2.5a5 5 0 0 0-3 9c.6.45 1 1.15 1 1.9v.6h4v-.6c0-.75.4-1.45 1-1.9a5 5 0 0 0-3-9z"/>
+        <path d="M8.3 17h3.4"/>
+        <path d="M8.8 18.5h2.4"/>
+      </svg>
+    </button>
+
+    <div class="toolbar-sep"></div>
+
+    <button class="btn btn-icon btn-icon-svg" id="btn-find" title="Find &amp; Replace (Ctrl/Cmd+F)">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="8.5" cy="8.5" r="5.5"/>
+        <path d="M16.5 16.5l-4-4"/>
+      </svg>
+    </button>
+    <button class="btn btn-icon btn-icon-svg" id="btn-undo" title="Undo (Ctrl/Cmd+Z)">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 8h8.5a4 4 0 1 1 0 8H9"/>
+        <path d="M7.5 4.5L4 8l3.5 3.5"/>
+      </svg>
+    </button>
+    <button class="btn btn-icon btn-icon-svg" id="btn-redo" title="Redo (Ctrl/Cmd+Shift+Z)">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M16 8H7.5a4 4 0 1 0 0 8H11"/>
+        <path d="M12.5 4.5L16 8l-3.5 3.5"/>
+      </svg>
+    </button>
 
     <div id="toolbar-actions">
       <button class="btn btn-icon" id="btn-clear" title="Clear output">⌫</button>
@@ -593,6 +780,7 @@ const SINGLE_KEYWORDS = new Set([
   'TRUE', 'FALSE', 'EMPTY',
   'AND', 'OR', 'NOT', 'XOR',
   'WRITE', 'WRITELN', 'INPUT', 'ERASE', 'STOP',
+  'SOUND', 'BELL',
   'STR', 'NUM', 'BOOL',
   'LENGTH', 'APPEND', 'REMOVE', 'INSERT', 'CONTAINS', 'REVERSE', 'SORT',
   'ABS', 'POW', 'ROUND', 'FLOOR', 'CEILING', 'SQRT', 'MIN', 'MAX',
@@ -919,7 +1107,7 @@ function tokenize(source) {
                 'UPPER', 'LOWER', 'TRIM', 'REPLACE', 'SPLIT', 'SUBSTRING',
                 'STARTSWITH', 'ENDSWITH',
                 'ISNUMBER', 'ISSTRING', 'ISBOOL', 'ISEMPTY', 'ISARRAY', 'ARRAY',
-                'INPUT', 'WRITE', 'WRITELN', 'LAST_ERROR',
+                'INPUT', 'WRITE', 'WRITELN', 'LAST_ERROR', 'SOUND', 'BELL',
               ]);
               isComment = !EXPR_START_KW.has(upper);
             }
@@ -1209,6 +1397,8 @@ class Parser {
       'UPPER', 'LOWER', 'TRIM', 'REPLACE', 'SPLIT', 'SUBSTRING',
       'STARTSWITH', 'ENDSWITH',
       'ARRAY',
+      // Sound — always used as statements (side effect, no return value used)
+      'SOUND', 'BELL',
     ].includes(kw);
   }
 
@@ -1783,6 +1973,7 @@ class Parser {
   isBuiltinFunction(kw) {
     return [
       'WRITE', 'WRITELN', 'INPUT', 'ERASE', 'STOP', 'SIGNAL',
+      'SOUND', 'BELL',
       'STR', 'NUM', 'BOOL',
       'LENGTH', 'APPEND', 'REMOVE', 'INSERT', 'CONTAINS', 'REVERSE', 'SORT',
       'ABS', 'POW', 'ROUND', 'FLOOR', 'CEILING', 'SQRT', 'MIN', 'MAX',
@@ -1926,11 +2117,35 @@ function displayValue(v) {
   return String(v);
 }
 
+// ─── SOUND — note name to frequency ───────────────────────────────────────────
+// Equal-tempered scale, A4 = 440 Hz. Accepts "C4", "A#3", "Bb5", etc.
+// Returns null if the string isn't a recognizable note name.
+
+const NOTE_SEMITONES_FROM_A = {
+  C: -9, D: -7, E: -5, F: -4, G: -2, A: 0, B: 2,
+};
+
+function noteNameToFrequency(name) {
+  const m = /^([A-Ga-g])([#b♭♯]?)(-?\d{1,2})$/.exec(name.trim());
+  if (!m) return null;
+
+  const letter = m[1].toUpperCase();
+  const accidental = m[2];
+  const octave = parseInt(m[3], 10);
+
+  let semitone = NOTE_SEMITONES_FROM_A[letter];
+  if (accidental === '#' || accidental === '♯') semitone += 1;
+  if (accidental === 'b' || accidental === '♭') semitone -= 1;
+
+  const semitonesFromA4 = semitone + (octave - 4) * 12;
+  return 440 * Math.pow(2, semitonesFromA4 / 12);
+}
+
 // ─── Evaluator ────────────────────────────────────────────────────────────────
 
 class Evaluator {
   /**
-   * @param {{ print: (s:string)=>void, erase: ()=>void, input: (prompt:string)=>Promise<string> }} io
+   * @param {{ print: (s:string)=>void, erase: ()=>void, input: (prompt:string)=>Promise<string>, sound: (freq:number, durationMs:number)=>Promise<void> }} io
    */
   constructor(io) {
     this.io = io;
@@ -1938,7 +2153,13 @@ class Evaluator {
     this.functionDefs = Object.create(null); // name → FunctionDecl node
     this.callDepth = 0;
     this.MAX_CALL_DEPTH = 500;
-    this.MAX_ITERATIONS = 1_000_000;
+    // Browser-safety limits. These are deliberately generous for a teaching
+    // language, but low enough to stop an accidental endless loop before it
+    // can monopolize the tab or create an enormous output DOM.
+    this.MAX_ITERATIONS = 10_000;
+    this.MAX_EXECUTION_STEPS = 100_000;
+    this.YIELD_EVERY_STEPS = 100;
+    this.executionSteps = 0;
     this.stopRequested = false;
 
     // LAST_ERROR object — always available
@@ -1957,6 +2178,35 @@ class Evaluator {
     this.lastError.MESSAGE = message;
     this.lastError.LINE    = line;
     this.lastError.CODE    = code;
+  }
+
+  // ── Cooperative execution guard ───────────────────────────────────────────
+  // Ported from the gibiddapress.com QF Code 1.1 build (2026-08-02 reconciliation).
+  // Runs once per executed statement (via execBlock) and once per loop
+  // iteration (WHILE/FOR/FOR EACH). A pure iteration cap on loops alone isn't
+  // enough — a long-running FUNCTION with no loop, or a chain of nested
+  // blocks, can still lock up the tab — so this counts total *statements*
+  // executed, not just loop turns.
+
+  async checkpoint(line = 0) {
+    if (this.stopRequested) throw new StopSignal();
+
+    this.executionSteps++;
+    if (this.executionSteps > this.MAX_EXECUTION_STEPS) {
+      throw new QFError(
+        `Program stopped after ${this.MAX_EXECUTION_STEPS.toLocaleString()} execution steps to keep the browser responsive. Check for a loop or function that never finishes.`,
+        line
+      );
+    }
+
+    // Awaiting an already-resolved promise only yields to the microtask
+    // queue, which can still starve painting and button clicks. A
+    // zero-delay timer yields to the browser's actual event loop, so Stop
+    // and the rest of the UI remain responsive while a program runs.
+    if (this.executionSteps % this.YIELD_EVERY_STEPS === 0) {
+      await new Promise(resolve => setTimeout(resolve, 0));
+      if (this.stopRequested) throw new StopSignal();
+    }
   }
 
   // ── Entry point ────────────────────────────────────────────────────────────
@@ -1980,6 +2230,7 @@ class Evaluator {
   async execBlock(stmts, env, resetErrors = true) {
     for (const stmt of stmts) {
       if (stmt.type === 'FunctionDecl') continue; // already registered
+      await this.checkpoint(stmt.line);
       if (resetErrors) this.resetLastError();
       await this.execStmt(stmt, env);
     }
@@ -2109,12 +2360,15 @@ class Evaluator {
   async execWhile(node, env) {
     let iterations = 0;
     while (true) {
-      if (this.stopRequested) throw new StopSignal();
-      if (++iterations > this.MAX_ITERATIONS) {
-        throw new QFError(`Infinite loop detected — WHILE ran more than ${this.MAX_ITERATIONS.toLocaleString()} times.`, node.line);
-      }
+      await this.checkpoint(node.line);
       const cond = await this.evalExpr(node.condition, env);
       if (!this.isTruthy(cond, node.condition.line)) break;
+      if (++iterations > this.MAX_ITERATIONS) {
+        throw new QFError(
+          `This WHILE loop was stopped after ${this.MAX_ITERATIONS.toLocaleString()} iterations to keep the browser responsive. Its condition may never become FALSE. Check that something inside the loop changes a value used by the condition.`,
+          node.line
+        );
+      }
       try {
         await this.execBlock(node.body, env);
       } catch (e) {
@@ -2147,9 +2401,12 @@ class Evaluator {
     try {
       let i = from;
       while (step > 0 ? i <= to : i >= to) {
-        if (this.stopRequested) throw new StopSignal();
+        await this.checkpoint(node.line);
         if (++iterations > this.MAX_ITERATIONS) {
-          throw new QFError(`FOR loop ran more than ${this.MAX_ITERATIONS.toLocaleString()} times.`, node.line);
+          throw new QFError(
+            `This FOR loop was stopped after ${this.MAX_ITERATIONS.toLocaleString()} iterations to keep the browser responsive. Use a smaller range or a larger STEP value.`,
+            node.line
+          );
         }
         env.vars[varName].value = i;
         try {
@@ -2179,7 +2436,7 @@ class Evaluator {
 
     try {
       for (const item of iterable) {
-        if (this.stopRequested) throw new StopSignal();
+        await this.checkpoint(node.line);
         env.vars[varName].value = item;
         try {
           await this.execBlock(node.body, env);
@@ -2611,6 +2868,37 @@ class Evaluator {
         throw new StopSignal();
       }
 
+      // ── Sound ───────────────────────────────────────────────────────────
+
+      case 'SOUND': {
+        if (argc !== 2) throw new QFError(`SOUND() requires exactly 2 arguments: a pitch and a duration in milliseconds. Example: SOUND("C4", 300) or SOUND(440, 300).`, line);
+        const [pitch, duration] = await evalArgs();
+
+        let freq;
+        if (typeof pitch === 'number') {
+          if (!(pitch > 0)) throw new QFError(`SOUND() frequency must be a positive number of Hz, got ${displayValue(pitch)}.`, line);
+          freq = pitch;
+        } else if (typeof pitch === 'string') {
+          freq = noteNameToFrequency(pitch);
+          if (freq === null) throw new QFError(`"${pitch}" isn't a note SOUND() understands. Tip: use a note name like "C4" or "A#3", or a frequency in Hz like 440.`, line);
+        } else {
+          throw new QFError(`SOUND()'s first argument must be a number (Hz) or a note name like "C4", got ${typeOf(pitch)}.`, line);
+        }
+
+        if (typeof duration !== 'number' || !(duration > 0)) {
+          throw new QFError(`SOUND()'s second argument must be a positive number of milliseconds, got ${displayValue(duration)}.`, line);
+        }
+
+        await this.io.sound(freq, duration);
+        return EMPTY;
+      }
+
+      case 'BELL': {
+        if (argc !== 0) throw new QFError(`BELL() takes no arguments. Did you mean SOUND(pitch, duration)?`, line);
+        await this.io.sound(880, 150);
+        return EMPTY;
+      }
+
       // ── Type conversion ──────────────────────────────────────────────────
 
       case 'STR': {
@@ -2866,11 +3154,13 @@ class StopSignal { constructor() {} }
 
 <!-- ── CodeMirror 6 via ESM CDN ────────────────────────────────────── -->
 <script type="module">
-import { EditorState } from 'https://esm.sh/@codemirror/state@6';
-import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection } from 'https://esm.sh/@codemirror/view@6';
-import { defaultKeymap, history, historyKeymap, indentWithTab } from 'https://esm.sh/@codemirror/commands@6';
+import { EditorState, StateField, StateEffect } from 'https://esm.sh/@codemirror/state@6';
+import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection, showTooltip } from 'https://esm.sh/@codemirror/view@6';
+import { defaultKeymap, history, historyKeymap, indentWithTab, undo, redo, undoDepth, redoDepth } from 'https://esm.sh/@codemirror/commands@6';
 import { StreamLanguage, syntaxHighlighting, HighlightStyle } from 'https://esm.sh/@codemirror/language@6';
 import { tags } from 'https://esm.sh/@lezer/highlight@1';
+import { autocompletion, acceptCompletion } from 'https://esm.sh/@codemirror/autocomplete@6';
+import { search, searchKeymap, openSearchPanel, closeSearchPanel, searchPanelOpen } from 'https://esm.sh/@codemirror/search@6';
 
 // ── QF CODE StreamLanguage for CodeMirror 6 ───────────────────────────
 
@@ -2883,18 +3173,12 @@ const KEYWORDS_SET = new Set([
 const BOOL_EMPTY = new Set(['TRUE','FALSE','EMPTY']);
 
 const BUILTINS_SET = new Set([
-  'WRITE','WRITELN','INPUT','ERASE','STOP','STR','NUM','BOOL',
+  'WRITE','WRITELN','INPUT','ERASE','STOP','SOUND','BELL','STR','NUM','BOOL',
   'LENGTH','APPEND','REMOVE','INSERT','CONTAINS','REVERSE','SORT',
   'ABS','POW','ROUND','FLOOR','CEILING','SQRT','MIN','MAX','RANDOM','RANDOMINT',
   'UPPER','LOWER','TRIM','REPLACE','SPLIT','SUBSTRING','STARTSWITH','ENDSWITH',
   'ISNUMBER','ISSTRING','ISBOOL','ISEMPTY','ISARRAY','ARRAY','LAST_ERROR',
 ]);
-
-// Multi-word keyword completions for auto-uppercase (handled in keymap)
-const MULTI_WORD = [
-  'FOR EACH','END FUNCTION','END WHILE','END IF',
-  'END FOR','END MATCH','END ATTEMPT','ELSE IF','WHEN ELSE',
-];
 
 const qfLanguage = StreamLanguage.define({
   token(stream) {
@@ -2931,43 +3215,358 @@ const qfHighlightStyle = HighlightStyle.define([
 
 const tokenTheme = syntaxHighlighting(qfHighlightStyle);
 
+// ── Autocomplete ────────────────────────────────────────────────────────
+// Scope (v1.1): keywords, built-ins, and a flat scan of user-declared
+// VAR/CONST/FUNCTION names anywhere in the current doc. No scoping
+// precision (a name declared inside one FUNCTION will still complete
+// everywhere) and no parameter-hint snippets — both are reasonable
+// fast-follows, not in this pass.
 
-// ── Auto-uppercase keywords as you type ──────────────────────────────
+// Local copy of the lexer's MULTI_WORD_KEYWORDS, same pattern as
+// KEYWORDS_SET/BUILTINS_SET above already mirroring the lexer's master
+// lists for CodeMirror's own purposes. Order doesn't matter here (unlike
+// the lexer's copy) since this is a flat completion list, not a tokenizer.
+const MULTI_WORD_COMPLETIONS = [
+  'FOR EACH', 'END FUNCTION', 'END WHILE', 'END IF', 'END FOR',
+  'END MATCH', 'END ATTEMPT', 'ELSE IF', 'WHEN ELSE',
+];
 
-const uppercaseKeywords = EditorView.updateListener.of(update => {
-  if (!update.docChanged) return;
-  const doc = update.state.doc;
-  const changes = [];
+// LAST_ERROR is the one BUILTINS_SET entry used bare, like an object
+// (LAST_ERROR.MESSAGE) — never called with parens. Everything else in
+// BUILTINS_SET is a parenthesized call, including zero-arg ones (BELL()).
+const BARE_BUILTINS = new Set(['LAST_ERROR']);
 
-  update.changes.iterChanges((fromA, toA, fromB, toB) => {
-    // Re-scan the line that was changed
-    const line = update.state.doc.lineAt(fromB);
-    const text = line.text;
-    const lineStart = line.from;
+// LAST_ERROR is also the only place in QF Code with property access at all
+// (see evalProperty in the evaluator, which throws for anything else) — so
+// this is a narrow, single-case completion rather than a general
+// member-access engine that would need to know about other object types.
+const LAST_ERROR_PROPERTIES = ['MESSAGE', 'LINE', 'CODE'];
 
-    // Find word tokens on this line and uppercase known keywords
-    const wordRe = /[A-Za-z_][A-Za-z0-9_]*/g;
-    let m;
-    while ((m = wordRe.exec(text)) !== null) {
-      const upper = m[0].toUpperCase();
-      if (m[0] !== upper && (KEYWORDS_SET.has(upper) || BUILTINS_SET.has(upper) || BOOL_EMPTY.has(upper))) {
-        changes.push({ from: lineStart + m.index, to: lineStart + m.index + m[0].length, insert: upper });
-      }
-    }
-  });
+// Shared case-matching rule (see qfCompletionSource below for the reasoning):
+// all-lowercase typed so far → lowercase suggestion; any uppercase present →
+// canonical uppercase suggestion.
+function toMatchedCase(typed, s) {
+  return /[A-Z]/.test(typed) ? s.toUpperCase() : s.toLowerCase();
+}
 
-  if (changes.length > 0) {
-    // Check we're not in a string (crude: skip if line has open quote before match)
-    // Full correctness would need the lexer; this works for the common case
-    setTimeout(() => {
-      update.view.dispatch({ changes, userEvent: 'input.autocorrect' });
-    }, 0);
+// Flat whole-document scan for VAR/CONST/FUNCTION declarations. QF Code
+// normalizes identifiers to uppercase internally, so dedupe case-insensitively
+// but display whatever case the user actually typed. The negative lookbehind
+// excludes END FUNCTION — without it, "END FUNCTION" followed by a blank line
+// and then "VAR foo" gets misread as a FUNCTION declaration named VAR, which
+// then swallows the real "VAR foo" declaration that follows.
+function scanDeclaredNames(docText) {
+  const names = new Map(); // uppercase -> original-case display name
+  const declRe = /(?<!END\s)\b(?:VAR|CONST|FUNCTION)\b\s+([A-Za-z_][A-Za-z0-9_]*)/gi;
+  let m;
+  while ((m = declRe.exec(docText))) {
+    names.set(m[1].toUpperCase(), m[1]);
   }
+  return names;
+}
+
+function qfCompletionSource(context) {
+  // LAST_ERROR.<property> — checked first, since a `.` doesn't match the
+  // plain-identifier regex below at all. Case basis: the property text typed
+  // so far if there is any, otherwise fall back to however LAST_ERROR itself
+  // was typed (so a bare "last_error." still suggests lowercase properties).
+  const dot = context.matchBefore(/\.[A-Za-z_]*/);
+  if (dot) {
+    const before = context.state.sliceDoc(Math.max(0, dot.from - 20), dot.from);
+    const identMatch = before.match(/([A-Za-z_][A-Za-z0-9_]*)\s*$/);
+    if (identMatch && identMatch[1].toUpperCase() === 'LAST_ERROR') {
+      const typedProp = dot.text.slice(1);
+      const caseBasis = typedProp.length > 0 ? typedProp : identMatch[1];
+      const options = LAST_ERROR_PROPERTIES.map(p => ({
+        label: toMatchedCase(caseBasis, p),
+        type: 'property',
+      }));
+      return { from: dot.from + 1, options, validFor: /^[A-Za-z_]*$/ };
+    }
+    // A dot after anything other than LAST_ERROR isn't valid QF Code
+    // (evalProperty rejects it at runtime too) — fall through silently
+    // rather than offering anything.
+  }
+
+  const word = context.matchBefore(/[A-Za-z_][A-Za-z0-9_]*/);
+  if (!word) return null;
+  // Require 2+ chars before popping up unprompted — at 1 char, every
+  // built-in and keyword is a "match" and the list is just noise.
+  if (word.from === word.to || (word.to - word.from < 2 && !context.explicit)) return null;
+
+  // Match the case the person is already typing rather than forcing the
+  // doc-convention UPPERCASE on every suggestion — QF Code is case-insensitive
+  // at runtime, so this is a style choice, not a correctness one, and the
+  // project already removed a forced-uppercase-while-typing feature for the
+  // same reason: imposing case on code the person is actively choosing to
+  // write differently. Rule: all-lowercase typed so far → lowercase
+  // suggestion; any uppercase present → canonical uppercase suggestion.
+  const options = [];
+
+  for (const kw of KEYWORDS_SET)  options.push({ label: toMatchedCase(word.text, kw), type: 'keyword' });
+  for (const kw of BOOL_EMPTY)    options.push({ label: toMatchedCase(word.text, kw), type: 'constant' });
+  for (const mw of MULTI_WORD_COMPLETIONS) options.push({ label: toMatchedCase(word.text, mw), type: 'keyword' });
+
+  for (const fn of BUILTINS_SET) {
+    const display = toMatchedCase(word.text, fn);
+    if (BARE_BUILTINS.has(fn)) {
+      options.push({ label: display, type: 'variable' });
+      continue;
+    }
+    // Pre-fill parens with the cursor placed between them — QF Code's
+    // "everything takes parens" rule has zero exceptions among callables,
+    // so this is a safe default rather than a guess.
+    options.push({
+      label: display,
+      type: 'function',
+      apply(view, completion, from, to) {
+        view.dispatch({
+          changes: { from, to, insert: `${display}()` },
+          selection: { anchor: from + display.length + 1 },
+        });
+      },
+    });
+  }
+
+  const declared = scanDeclaredNames(context.state.doc.toString());
+  for (const [upper, display] of declared) {
+    if (KEYWORDS_SET.has(upper) || BUILTINS_SET.has(upper) || BOOL_EMPTY.has(upper)) continue;
+    options.push({ label: display, type: 'variable' });
+  }
+
+  return { from: word.from, options, validFor: /^[A-Za-z_][A-Za-z0-9_]*$/ };
+}
+
+// ── Signature help (parameter tooltip) ──────────────────────────────────
+// Shows "WRITELN(value, ...)"-style tooltips while the cursor sits inside a
+// call's parens, with the parameter under the cursor highlighted — same idea
+// as VS Code/etc. Pulled directly from each case in callBuiltin(), not from
+// the QFError prose (which is sometimes worded looser than what's enforced).
+
+// Most built-ins are fixed-arity: `params` lists the display names in order.
+// A few are different shapes, handled separately below:
+//   - WRITE/WRITELN are variadic (`variadic: true` — same param repeats).
+//   - ERASE/ARRAY are overloaded (`overloads` — a list of valid param lists).
+// `note` is an optional one-line clarification shown under the signature for
+// the handful of built-ins where the param name alone is ambiguous.
+const BUILTIN_SIGNATURES = {
+  INPUT:      { params: ['prompt'] },
+  STOP:       { params: [] },
+  SOUND:      { params: ['pitch', 'duration_ms'], note: 'pitch: a number in Hz, or a note name like "C4"' },
+  BELL:       { params: [] },
+  STR:        { params: ['value'] },
+  NUM:        { params: ['value'] },
+  BOOL:       { params: ['value'] },
+  ISNUMBER:   { params: ['value'] },
+  ISSTRING:   { params: ['value'] },
+  ISBOOL:     { params: ['value'] },
+  ISEMPTY:    { params: ['value'] },
+  ISARRAY:    { params: ['value'] },
+  LENGTH:     { params: ['value'], note: 'value: a string or an array' },
+  UPPER:      { params: ['string'] },
+  LOWER:      { params: ['string'] },
+  TRIM:       { params: ['string'] },
+  CONTAINS:   { params: ['collection', 'value'], note: 'collection: a string or an array' },
+  REPLACE:    { params: ['string', 'old', 'new'] },
+  SPLIT:      { params: ['string', 'delimiter'] },
+  SUBSTRING:  { params: ['string', 'start', 'length'] },
+  STARTSWITH: { params: ['string', 'prefix'] },
+  ENDSWITH:   { params: ['string', 'suffix'] },
+  ABS:        { params: ['number'] },
+  POW:        { params: ['base', 'exponent'] },
+  ROUND:      { params: ['number'] },
+  FLOOR:      { params: ['number'] },
+  CEILING:    { params: ['number'] },
+  SQRT:       { params: ['number'] },
+  MIN:        { params: ['a', 'b'] },
+  MAX:        { params: ['a', 'b'] },
+  RANDOM:     { params: [] },
+  RANDOMINT:  { params: ['min', 'max'] },
+  APPEND:     { params: ['array', 'value'] },
+  REMOVE:     { params: ['array', 'index'] },
+  INSERT:     { params: ['array', 'index', 'value'] },
+  REVERSE:    { params: ['array'] },
+  SORT:       { params: ['array'] },
+
+  WRITE:      { variadic: true, params: ['value'], note: 'any number of values, space-joined, no newline' },
+  WRITELN:    { variadic: true, params: ['value'], note: 'any number of values, space-joined, plus a newline' },
+  ERASE:      { overloads: [[], ['array']], note: 'no arguments clears the output panel; one array argument clears that array' },
+  ARRAY:      { overloads: [[], ['size']], note: 'no arguments makes an empty array; one argument makes an array of that size, filled with EMPTY' },
+  // LAST_ERROR deliberately omitted — used bare, like an object, never with
+  // parens, so it never opens a call and never reaches this code.
+};
+
+// Scans the doc for FUNCTION name(params) declarations so user functions get
+// the same tooltip treatment. QF Code function params are plain identifiers
+// with no defaults and no nested parens (see parseFunctionDecl), so a
+// non-nested-paren regex is safe here. Same negative-lookbehind fix as
+// scanDeclaredNames, for the same "END FUNCTION" reason.
+function scanFunctionParams(docText) {
+  const fns = new Map(); // uppercase name -> { display, params: string[] }
+  const fnRe = /(?<!END\s)\bFUNCTION\b\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)/gi;
+  let m;
+  while ((m = fnRe.exec(docText))) {
+    const display = m[1];
+    const params = m[2].trim() === '' ? [] : m[2].split(',').map(p => p.trim());
+    fns.set(display.toUpperCase(), { display, params });
+  }
+  return fns;
+}
+
+// Walks the doc forward up to `uptoPos`, tracking a bracket stack so we know,
+// at the cursor, which call (if any) we're inside and how many top-level
+// commas precede the cursor within it. Skips string contents and `//`
+// comments so commas/parens there don't confuse the count. Deliberately a
+// single forward pass rather than scanning backward from the cursor, since
+// "are we inside a string" is only cheap to answer moving forward.
+function scanCallStack(text, uptoPos) {
+  const stack = [];
+  let prevIdent = null; // most recent identifier token, used to detect "NAME("  as a call
+  let i = 0;
+  while (i < uptoPos) {
+    const ch = text[i];
+    if (ch === '"') {
+      i++;
+      while (i < uptoPos && text[i] !== '"') { if (text[i] === '\\') i++; i++; }
+      i++;
+      prevIdent = null;
+      continue;
+    }
+    if (ch === '/' && text[i + 1] === '/') {
+      while (i < uptoPos && text[i] !== '\n') i++;
+      continue;
+    }
+    if (ch === '(') { stack.push({ kind: '(', calleeName: prevIdent, commaCount: 0 }); prevIdent = null; i++; continue; }
+    if (ch === ')') { if (stack.length && stack[stack.length - 1].kind === '(') stack.pop(); prevIdent = null; i++; continue; }
+    if (ch === '[') { stack.push({ kind: '[', calleeName: null, commaCount: 0 }); prevIdent = null; i++; continue; }
+    if (ch === ']') { if (stack.length && stack[stack.length - 1].kind === '[') stack.pop(); prevIdent = null; i++; continue; }
+    if (ch === ',') { if (stack.length) stack[stack.length - 1].commaCount++; prevIdent = null; i++; continue; }
+    if (/[A-Za-z_]/.test(ch)) {
+      let j = i + 1;
+      while (j < uptoPos && /[A-Za-z0-9_]/.test(text[j])) j++;
+      prevIdent = text.slice(i, j).toUpperCase();
+      i = j;
+      continue;
+    }
+    if (!/\s/.test(ch)) prevIdent = null;
+    i++;
+  }
+  return stack;
+}
+
+// Finds the nearest enclosing call (built-in or user function) at `pos`,
+// searching the stack top-down so an intervening grouping-paren or array
+// literal — e.g. `SOUND(ARRAY[i], 100)` — doesn't block finding SOUND's call.
+function findEnclosingCall(docText, pos) {
+  const stack = scanCallStack(docText, pos);
+  const userFns = scanFunctionParams(docText);
+  for (let k = stack.length - 1; k >= 0; k--) {
+    const frame = stack[k];
+    if (frame.kind !== '(' || !frame.calleeName) continue;
+    if (BUILTIN_SIGNATURES[frame.calleeName]) {
+      return { name: frame.calleeName, sig: BUILTIN_SIGNATURES[frame.calleeName], activeParam: frame.commaCount };
+    }
+    if (userFns.has(frame.calleeName)) {
+      const fn = userFns.get(frame.calleeName);
+      return { name: fn.display, sig: { params: fn.params }, activeParam: frame.commaCount };
+    }
+    // Unrecognized call (typo, or a builtin we don't have signature data
+    // for) — keep searching outward rather than giving up immediately.
+  }
+  return null;
+}
+
+// Renders one signature line as DOM, bolding the active parameter.
+function renderSignatureLine(name, params, activeParam, variadic) {
+  const line = document.createElement('div');
+  line.className = 'cm-qf-sig-line';
+  line.append(`${name}(`);
+  params.forEach((p, idx) => {
+    if (idx > 0) line.append(', ');
+    const isActive = variadic ? true : idx === Math.min(activeParam, params.length - 1);
+    if (params.length === 0) return;
+    const span = document.createElement(isActive ? 'strong' : 'span');
+    span.textContent = p;
+    line.append(span);
+  });
+  if (variadic) line.append(', ...');
+  line.append(')');
+  return line;
+}
+
+function getSignatureTooltip(state) {
+  const pos = state.selection.main.head;
+  const docText = state.doc.toString();
+  const call = findEnclosingCall(docText, pos);
+  if (!call) return null;
+
+  return {
+    pos,
+    above: true,
+    create() {
+      const dom = document.createElement('div');
+      dom.className = 'cm-qf-signature-tooltip';
+
+      if (call.sig.overloads) {
+        call.sig.overloads.forEach(params => {
+          dom.appendChild(renderSignatureLine(call.name, params, call.activeParam, false));
+        });
+      } else {
+        dom.appendChild(renderSignatureLine(call.name, call.sig.params, call.activeParam, !!call.sig.variadic));
+      }
+
+      if (!call.sig.variadic && !call.sig.overloads && call.activeParam >= call.sig.params.length && call.sig.params.length > 0) {
+        const warn = document.createElement('div');
+        warn.className = 'cm-qf-sig-note cm-qf-sig-warn';
+        warn.textContent = `${call.name}() takes ${call.sig.params.length} argument${call.sig.params.length === 1 ? '' : 's'} — this looks like one too many.`;
+        dom.appendChild(warn);
+      } else if (call.sig.note) {
+        const note = document.createElement('div');
+        note.className = 'cm-qf-sig-note';
+        note.textContent = call.sig.note;
+        dom.appendChild(note);
+      }
+
+      return { dom };
+    },
+  };
+}
+
+// Lets Escape dismiss the signature tooltip without disabling it for the
+// rest of the session — typing again or moving the cursor re-engages it,
+// same as the autocomplete dropdown's own Escape behavior.
+const dismissSignatureTooltip = StateEffect.define();
+
+const signatureTooltipField = StateField.define({
+  create(state) {
+    return { tooltip: getSignatureTooltip(state), dismissed: false };
+  },
+  update(value, tr) {
+    for (const e of tr.effects) {
+      if (e.is(dismissSignatureTooltip)) return { tooltip: value.tooltip, dismissed: true };
+    }
+    if (!tr.docChanged && !tr.selection) return value;
+    // Any edit or cursor move re-engages signature help and recomputes fresh.
+    return { tooltip: getSignatureTooltip(tr.state), dismissed: false };
+  },
+  provide: f => showTooltip.from(f, value => value.dismissed ? null : value.tooltip),
 });
+
+// Bound to Escape below. Returns false (declines the key) when there's no
+// signature tooltip to dismiss, so Escape still falls through to whatever
+// else wants it — e.g. closing an open autocomplete dropdown, which is
+// checked first since @codemirror/autocomplete registers its own Escape
+// binding at Prec.highest.
+function dismissSignatureHelp(view) {
+  const value = view.state.field(signatureTooltipField, false);
+  if (!value || !value.tooltip || value.dismissed) return false;
+  view.dispatch({ effects: dismissSignatureTooltip.of(null) });
+  return true;
+}
 
 // ── Default starter program ───────────────────────────────────────────
 
-const STARTER = `// QF CODE v1 — Welcome to QuibbleFox!
+const STARTER = `// QF Code v1.1 — Welcome to QuibbleFox!
 
 WRITELN("What's your name?")
 VAR name = INPUT("Name: ")
@@ -2982,19 +3581,48 @@ END WHILE
 WRITELN("Ready to go!")
 `;
 
-const EXAMPLE = `// QF CODE v1 — FizzBuzz
+const EXAMPLE = `// QF Code v1.1 — Feature Tour: Functions, Arrays & Sound!
+// A quick look at a few things QF Code can do beyond the basics.
 
-FOR i = 1 TO 20
-  IF i % 15 == 0 THEN
-    WRITELN("FizzBuzz")
-  ELSE IF i % 3 == 0 THEN
-    WRITELN("Fizz")
-  ELSE IF i % 5 == 0 THEN
-    WRITELN("Buzz")
+FUNCTION Grade(value)
+  IF value >= 90 THEN
+    RETURN "A"
+  ELSE IF value >= 80 THEN
+    RETURN "B"
+  ELSE IF value >= 70 THEN
+    RETURN "C"
   ELSE
-    WRITELN(i)
+    RETURN "Needs practice"
   END IF
+END FUNCTION
+
+VAR scores = ARRAY()
+APPEND(scores, 95)
+APPEND(scores, 82)
+APPEND(scores, 68)
+
+WRITELN("Grading", LENGTH(scores), "scores...")
+
+FOR EACH score IN scores
+  VAR letter = Grade(score)
+  WRITELN(score, "->", letter)
 END FOR
+
+WRITELN("")
+WRITELN("Nice work! Here's a little fanfare:")
+
+VAR fanfare = ARRAY()
+APPEND(fanfare, "C4")
+APPEND(fanfare, "E4")
+APPEND(fanfare, "G4")
+APPEND(fanfare, "C5")
+
+FOR EACH note IN fanfare
+  SOUND(note, 200)
+END FOR
+
+BELL()
+WRITELN("All done!")
 `;
 
 // ── Editor setup ──────────────────────────────────────────────────────
@@ -3014,13 +3642,23 @@ const view = new EditorView({
       highlightActiveLine(),
       highlightActiveLineGutter(),
       drawSelection(),
-      keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
+      // Tab accepts the active completion, same as Enter — acceptCompletion
+      // returns false when nothing's open, so it falls through to
+      // indentWithTab for normal Tab-indent behavior.
+      keymap.of([{ key: 'Tab', run: acceptCompletion }, ...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab]),
+      keymap.of([{ key: 'Escape', run: dismissSignatureHelp }]),
       qfLanguage,
       tokenTheme,
       editorTheme,
-      uppercaseKeywords,
+      autocompletion({ override: [qfCompletionSource], activateOnTyping: true }),
+      signatureTooltipField,
+      // top: true puts the find/replace panel at the top of the editor,
+      // matching VS Code/Sublime/etc. — same "transfers everywhere" reasoning
+      // as Tab-to-accept on autocomplete. Package default is bottom.
+      search({ top: true }),
       EditorView.updateListener.of(u => {
         if (u.selectionSet) updateCursorPos(u.state);
+        if (u.docChanged) updateUndoRedoButtons(u.state);
       }),
     ],
   }),
@@ -3034,11 +3672,24 @@ function updateCursorPos(state) {
     `Ln ${line.number}, Col ${pos - line.from + 1}`;
 }
 
+// Keeps the toolbar's Undo/Redo buttons reflecting real history state —
+// disabled when there's genuinely nothing to undo/redo, rather than always
+// clickable and silently doing nothing.
+function updateUndoRedoButtons(state) {
+  document.getElementById('btn-undo').disabled = undoDepth(state) === 0;
+  document.getElementById('btn-redo').disabled = redoDepth(state) === 0;
+}
+updateUndoRedoButtons(view.state); // initial state — STARTER has no history yet, both start disabled
+
 // ── Output panel ──────────────────────────────────────────────────────
 
 const outputHost = document.getElementById('output-host');
 const outputEmpty = document.getElementById('output-empty');
+const MAX_OUTPUT_LINES = 1_000;
+const MAX_OUTPUT_CHARACTERS = 100_000;
 let lineCount = 0;
+let outputCharacterCount = 0;
+let outputLimitNotice = null;
 let currentWriteLine = null;  // tracks the active WRITE line (null when last call was WRITELN)
 
 function showEmpty(show) {
@@ -3050,13 +3701,60 @@ function clearOutput() {
   const toRemove = [...outputHost.children].filter(el => el !== outputEmpty);
   toRemove.forEach(el => el.remove());
   lineCount = 0;
+  outputCharacterCount = 0;
+  outputLimitNotice = null;
   currentWriteLine = null;
   showEmpty(true);
+}
+
+function showOutputLimitNotice() {
+  if (outputLimitNotice) return;
+  showEmpty(false);
+  currentWriteLine = null;
+
+  const row = document.createElement('div');
+  row.className = 'output-line system';
+
+  const gutter = document.createElement('span');
+  gutter.className = 'output-gutter';
+  gutter.textContent = '…';
+
+  const content = document.createElement('span');
+  content.className = 'output-text';
+  content.textContent = `Additional output is being hidden after ${MAX_OUTPUT_LINES.toLocaleString()} lines or ${MAX_OUTPUT_CHARACTERS.toLocaleString()} characters to keep the browser responsive. The program is still running.`;
+
+  row.appendChild(gutter);
+  row.appendChild(content);
+  outputHost.appendChild(row);
+  outputHost.scrollTop = outputHost.scrollHeight;
+  outputLimitNotice = row;
+}
+
+function finalizeOutputLimitNotice() {
+  if (!outputLimitNotice) return;
+  const content = outputLimitNotice.querySelector('.output-text');
+  if (content) {
+    content.textContent = `Additional output was hidden after ${MAX_OUTPUT_LINES.toLocaleString()} lines or ${MAX_OUTPUT_CHARACTERS.toLocaleString()} characters to keep the browser responsive.`;
+  }
+}
+
+function reserveOutput(text, startsNewLine) {
+  const value = String(text);
+  if ((startsNewLine && lineCount >= MAX_OUTPUT_LINES) ||
+      outputCharacterCount + value.length > MAX_OUTPUT_CHARACTERS) {
+    showOutputLimitNotice();
+    return null;
+  }
+  outputCharacterCount += value.length;
+  return value;
 }
 
 // WRITE() — append text to the current line (no newline).
 // If no current line exists, start a new one.
 function appendOutputText(text) {
+  const value = reserveOutput(text, !currentWriteLine);
+  if (value === null) return;
+
   showEmpty(false);
   if (!currentWriteLine) {
     lineCount++;
@@ -3067,20 +3765,24 @@ function appendOutputText(text) {
     gutter.textContent = lineCount;
     const content = document.createElement('span');
     content.className = 'output-text';
-    content.textContent = text;
+    content.textContent = value;
     row.appendChild(gutter);
     row.appendChild(content);
     outputHost.appendChild(row);
     outputHost.scrollTop = outputHost.scrollHeight;
     currentWriteLine = content;
   } else {
-    currentWriteLine.textContent += text;
+    currentWriteLine.textContent += value;
     outputHost.scrollTop = outputHost.scrollHeight;
   }
 }
 
 // WRITELN() — append text as a new complete line.
 function appendOutputLine(text, cls = '') {
+  const isSystemLine = cls.split(/\s+/).includes('system');
+  const value = isSystemLine ? String(text) : reserveOutput(text, true);
+  if (value === null) return null;
+
   showEmpty(false);
   currentWriteLine = null;  // WRITELN always completes the current line
   lineCount++;
@@ -3093,7 +3795,7 @@ function appendOutputLine(text, cls = '') {
 
   const content = document.createElement('span');
   content.className = 'output-text';
-  content.textContent = text;
+  content.textContent = value;
 
   row.appendChild(gutter);
   row.appendChild(content);
@@ -3177,6 +3879,52 @@ function requestInput(prompt) {
   });
 }
 
+// ── SOUND() / BELL() — Web Audio playback ───────────────────────────────
+
+let audioCtx = null;
+
+function getAudioCtx() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  // Browsers suspend audio contexts until a user gesture; clicking Run counts.
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+// Plays a tone at `freq` Hz for `durationMs` milliseconds.
+// Resolves once the tone (including its short fade-out tail) has finished,
+// so SOUND()/BELL() block program execution like INPUT() does.
+function playTone(freq, durationMs) {
+  return new Promise((resolve) => {
+    const ctx = getAudioCtx();
+    const osc  = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+
+    const now = ctx.currentTime;
+    const dur = durationMs / 1000;
+    const attack  = Math.min(0.015, dur / 4); // fade in, avoids a click
+    const release = Math.min(0.03,  dur / 4); // fade out, avoids a click
+
+    // Volume envelope: silent → peak → silent
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.25, now + attack);
+    gain.gain.setValueAtTime(0.25, now + Math.max(attack, dur - release));
+    gain.gain.linearRampToValueAtTime(0, now + dur);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + dur);
+
+    osc.onended = () => resolve();
+  });
+}
+
 // ── Runner ────────────────────────────────────────────────────────────
 
 let running = false;
@@ -3212,13 +3960,9 @@ async function runProgram() {
   const io = {
     print: (text) => appendOutputLine(text),
     write: (text) => appendOutputText(text),
-    erase: ()     => {
-      const toRemove = [...outputHost.children].filter(el => el !== outputEmpty);
-      toRemove.forEach(el => el.remove());
-      lineCount = 0;
-      currentWriteLine = null;
-    },
+    erase: ()     => clearOutput(),
     input: (prompt) => requestInput(prompt),
+    sound: (freq, durationMs) => playTone(freq, durationMs),
   };
 
   try {
@@ -3258,10 +4002,136 @@ async function runProgram() {
     }
     document.getElementById('status-runtime').textContent = `${elapsed}s`;
   } finally {
+    finalizeOutputLimitNotice();
     activeEvaluator = null;
     setRunning(false);
     view.focus();
   }
+}
+
+// ── File Open/Save ───────────────────────────────────────────────────
+// Two layers, deliberately kept separate so the lower one can be reused by
+// the language's future FILE READ/WRITE statements (backlog #2), which need
+// the same picker mechanics but none of the shell's "what file is the editor
+// currently tracking" bookkeeping:
+//
+//   pickOpenFile() / pickSaveFile() — raw browser-API wrappers. No knowledge
+//     of the editor, no global state. Feature-detect the File System Access
+//     API (Chromium) and fall back to <input type="file"> / Blob+<a download>
+//     (Safari, Firefox) automatically.
+//
+//   currentFileHandle / currentFileName + the btn-open/btn-save handlers
+//     below — shell-specific: track which file the editor is open from,
+//     update the toolbar label, and decide when to confirm before
+//     overwriting the editor's contents.
+
+function fsAccessSupported() {
+  return 'showOpenFilePicker' in window && 'showSaveFilePicker' in window;
+}
+
+const QFC_PICKER_TYPES = [{
+  description: 'QF Code files',
+  accept: { 'text/plain': ['.qfc'] },
+}];
+
+// Returns { name, content, handle } — handle is null on the fallback path
+// (nothing to write back to later). Returns null if the user cancels.
+async function pickOpenFile() {
+  if (fsAccessSupported()) {
+    let handles;
+    try {
+      handles = await window.showOpenFilePicker({ types: QFC_PICKER_TYPES, multiple: false });
+    } catch (e) {
+      if (e.name === 'AbortError') return null; // user cancelled the picker
+      throw e;
+    }
+    const handle = handles[0];
+    const file = await handle.getFile();
+    const content = await file.text();
+    return { name: file.name, content, handle };
+  }
+  // Fallback: a hidden <input type="file">, same trick used for any
+  // "open a file" UI when the native picker API isn't available.
+  return new Promise(resolve => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.qfc,text/plain';
+    input.addEventListener('change', () => {
+      const file = input.files && input.files[0];
+      if (!file) { resolve(null); return; }
+      const reader = new FileReader();
+      reader.onload = () => resolve({ name: file.name, content: reader.result, handle: null });
+      reader.onerror = () => resolve(null);
+      reader.readAsText(file);
+    });
+    // Not all browsers fire 'cancel' on <input type="file"> (Safari support
+    // is inconsistent) — where it does fire, this avoids leaving the
+    // promise pending forever if the user dismisses the OS dialog. Where it
+    // doesn't fire, the worst case is the button silently doing nothing on
+    // cancel, not a crash.
+    input.addEventListener('cancel', () => resolve(null));
+    input.click();
+  });
+}
+
+// Writes `content` to `handle` directly (silent in-place overwrite) if one's
+// already open — the entire point of the File System Access API for this
+// feature. Otherwise prompts via the native save picker (Chromium) or falls
+// back to a Blob + <a download> (Safari/Firefox — always a fresh download;
+// there's no handle mechanism on that path, so every save goes through here
+// again next time). Returns { name, handle } on success, null if the user
+// cancels a picker.
+async function pickSaveFile(content, handle, suggestedName) {
+  if (handle) {
+    const writable = await handle.createWritable();
+    await writable.write(content);
+    await writable.close();
+    return { name: handle.name, handle };
+  }
+  if (fsAccessSupported()) {
+    let newHandle;
+    try {
+      newHandle = await window.showSaveFilePicker({
+        types: QFC_PICKER_TYPES,
+        suggestedName: suggestedName || 'untitled.qfc',
+      });
+    } catch (e) {
+      if (e.name === 'AbortError') return null;
+      throw e;
+    }
+    const writable = await newHandle.createWritable();
+    await writable.write(content);
+    await writable.close();
+    return { name: newHandle.name, handle: newHandle };
+  }
+  const blob = new Blob([content], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = suggestedName || 'untitled.qfc';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  return { name: a.download, handle: null };
+}
+
+// Shell-level state: which file (if any) the editor is currently tracking.
+let currentFileHandle = null;
+let currentFileName = 'untitled.qfc';
+
+function updateFileNameLabel() {
+  document.getElementById('current-filename').textContent = currentFileName;
+}
+
+// Be honest in the UI about the fallback's real limitation — every save on
+// Safari/Firefox is a fresh download, never a true in-place overwrite, so
+// Save and Save As end up functionally identical there.
+if (!fsAccessSupported()) {
+  document.getElementById('btn-save').title =
+    "Save (your browser doesn't support saving in place — this downloads a new file each time)";
+  document.getElementById('btn-save-as').title =
+    "Save As (your browser always downloads a new file — Save and Save As behave the same here)";
 }
 
 // ── Button handlers ───────────────────────────────────────────────────
@@ -3283,8 +4153,11 @@ document.getElementById('btn-clear').addEventListener('click', () => {
 document.getElementById('btn-new').addEventListener('click', () => {
   if (confirm('Clear the editor and start fresh?')) {
     view.dispatch({
-      changes: { from: 0, to: view.state.doc.length, insert: '// QF CODE v1\n\n' }
+      changes: { from: 0, to: view.state.doc.length, insert: '// QF Code v1.1\n\n' }
     });
+    currentFileHandle = null;
+    currentFileName = 'untitled.qfc';
+    updateFileNameLabel();
     clearOutput();
     setStatus('', 'Ready');
     view.focus();
@@ -3295,9 +4168,96 @@ document.getElementById('btn-example').addEventListener('click', () => {
   view.dispatch({
     changes: { from: 0, to: view.state.doc.length, insert: EXAMPLE }
   });
+  // No confirmation here, by design (matches this button's existing
+  // behavior) — but the file-tracking state still resets, so a Save right
+  // after loading the example can't silently overwrite a previously open,
+  // unrelated file.
+  currentFileHandle = null;
+  currentFileName = 'untitled.qfc';
+  updateFileNameLabel();
   clearOutput();
   setStatus('', 'Example loaded — press Run');
   view.focus();
+});
+
+// Toolbar mirror of Ctrl/Cmd+F — same toggle behavior either way, so the
+// button and the shortcut never get out of sync with each other.
+document.getElementById('btn-find').addEventListener('click', () => {
+  if (searchPanelOpen(view.state)) {
+    closeSearchPanel(view);
+  } else {
+    openSearchPanel(view);
+  }
+});
+
+// Toolbar mirrors of Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z — undo()/redo() are
+// CodeMirror's own commands, same ones historyKeymap already binds, so the
+// buttons and the shortcuts can never drift apart.
+document.getElementById('btn-undo').addEventListener('click', () => {
+  undo(view);
+  view.focus();
+});
+document.getElementById('btn-redo').addEventListener('click', () => {
+  redo(view);
+  view.focus();
+});
+
+document.getElementById('btn-open').addEventListener('click', async () => {
+  if (!confirm('Clear the editor and open a different file?')) return;
+  let result;
+  try {
+    result = await pickOpenFile();
+  } catch (e) {
+    setStatus('error', `Couldn't open that file: ${e.message}`);
+    return;
+  }
+  if (!result) return; // user cancelled
+  view.dispatch({
+    changes: { from: 0, to: view.state.doc.length, insert: result.content }
+  });
+  currentFileHandle = result.handle;
+  currentFileName = result.name;
+  updateFileNameLabel();
+  clearOutput();
+  setStatus('success', `Opened ${result.name}`);
+  view.focus();
+});
+
+document.getElementById('btn-save').addEventListener('click', async () => {
+  const content = view.state.doc.toString();
+  let result;
+  try {
+    result = await pickSaveFile(content, currentFileHandle, currentFileName);
+  } catch (e) {
+    setStatus('error', `Couldn't save: ${e.message}`);
+    return;
+  }
+  if (!result) return; // user cancelled the picker
+  currentFileHandle = result.handle;
+  currentFileName = result.name;
+  updateFileNameLabel();
+  setStatus('success', `Saved ${result.name}`);
+});
+
+document.getElementById('btn-save-as').addEventListener('click', async () => {
+  const content = view.state.doc.toString();
+  let result;
+  try {
+    // Pass null for the handle regardless of what's currently tracked —
+    // that's the entire difference from plain Save: always force a fresh
+    // picker rather than silently overwriting the current file.
+    result = await pickSaveFile(content, null, currentFileName);
+  } catch (e) {
+    setStatus('error', `Couldn't save: ${e.message}`);
+    return;
+  }
+  if (!result) return; // user cancelled the picker
+  // Save As switches the editor's tracked file to the new one, same as any
+  // desktop editor — the next plain Save now writes here, not the old file.
+  currentFileHandle = result.handle;
+  currentFileName = result.name;
+  updateFileNameLabel();
+  setStatus('success', `Saved as ${result.name}`);
 });
 
 // Keyboard shortcut: Ctrl/Cmd+Enter → run
