@@ -4,7 +4,7 @@
  * Run with: node qfcode-lexer-tests.js
  */
 
-const { tokenize, LexerError } = require('./qfcode-lexer.js');
+const { tokenize, LexerError } = require('../qfcode-lexer.js');
 
 let passed = 0;
 let failed = 0;
@@ -50,11 +50,11 @@ console.log('\n§2 Lexical Rules');
 
 // 2.2 Case insensitivity — keywords
 {
-  const variants = ['print', 'PRINT', 'Print', 'pRiNt'];
+  const variants = ['writeln', 'WRITELN', 'Writeln', 'wRiTeLn'];
   for (const v of variants) {
     const t = meaningful(tokens(v));
-    assert(`Keyword "${v}" normalizes to KEYWORD:PRINT`,
-      t.length === 1 && t[0].type === 'KEYWORD' && t[0].value === 'PRINT');
+    assert(`Keyword "${v}" normalizes to KEYWORD:WRITELN`,
+      t.length === 1 && t[0].type === 'KEYWORD' && t[0].value === 'WRITELN');
   }
 
   // Identifiers also case-insensitive (stored uppercase)
@@ -84,10 +84,10 @@ console.log('\n§2 Lexical Rules');
   const t = meaningful(tokens('// This is a comment'));
   assert('Full-line comment produces no tokens', t.length === 0);
 
-  const t2 = meaningful(tokens('PRINT("Hello")    // inline comment'));
-  assert('Inline comment — only PRINT, (, "Hello", ) survive',
+  const t2 = meaningful(tokens('WRITELN("Hello")    // inline comment'));
+  assert('Inline comment — only WRITELN, (, "Hello", ) survive',
     t2.length === 4 &&
-    t2[0].value === 'PRINT' &&
+    t2[0].value === 'WRITELN' &&
     t2[3].value === ')');
 }
 
@@ -226,18 +226,18 @@ console.log('\n§5 Operators');
 console.log('\n§6-9 Statements & I/O');
 
 {
-  // PRINT("Hello, World!")
-  const t = meaningful(tokens('PRINT("Hello, World!")'));
-  assert('PRINT("Hello, World!") tokenizes',
-    t[0].value === 'PRINT' &&
+  // WRITELN("Hello, World!")
+  const t = meaningful(tokens('WRITELN("Hello, World!")'));
+  assert('WRITELN("Hello, World!") tokenizes',
+    t[0].value === 'WRITELN' &&
     t[1].value === '(' &&
     t[2].type === 'STRING' && t[2].value === 'Hello, World!' &&
     t[3].value === ')');
 
-  // PRINT("Score:", score)
-  const t2 = meaningful(tokens('PRINT("Score:", score)'));
-  assert('PRINT with multiple args tokenizes',
-    t2[0].value === 'PRINT' &&
+  // WRITE("Score:", score)
+  const t2 = meaningful(tokens('WRITE("Score:", score)'));
+  assert('WRITE with multiple args tokenizes',
+    t2[0].value === 'WRITE' &&
     t2[2].value === 'Score:' &&
     t2[3].value === ',' &&
     t2[4].type === 'IDENTIFIER');
@@ -420,7 +420,7 @@ console.log('\n§ Multi-line program');
   const src = `// QF CODE v1
 VAR score = 0
 VAR player = ""
-PRINT("Hello,", player)
+WRITELN("Hello,", player)
 score = score + 10`;
 
   const toks = tokenize(src);
@@ -435,8 +435,8 @@ score = score + 10`;
   const varScore = toks.find(t => t.type === 'KEYWORD' && t.value === 'VAR');
   assert('VAR on line 2 has correct line number', varScore && varScore.line === 2);
 
-  const printTok = toks.find(t => t.value === 'PRINT');
-  assert('PRINT on line 4 has correct line number', printTok && printTok.line === 4);
+  const writelnTok = toks.find(t => t.value === 'WRITELN');
+  assert('WRITELN on line 4 has correct line number', writelnTok && writelnTok.line === 4);
 }
 
 // ─── Edge cases ───────────────────────────────────────────────────────────────
@@ -465,9 +465,9 @@ console.log('\n§ Edge Cases');
   assertLexError('Unknown character # raises LexerError', '#comment');
 
   // raw field preserved
-  const t4 = meaningful(tokens('Print'));
+  const t4 = meaningful(tokens('Writeln'));
   assert('raw field preserves original casing for keywords',
-    t4[0].type === 'KEYWORD' && t4[0].value === 'PRINT' && t4[0].raw === 'Print');
+    t4[0].type === 'KEYWORD' && t4[0].value === 'WRITELN' && t4[0].raw === 'Writeln');
 
   // Integer division not confused with comment
   const t5 = meaningful(tokens('result = a // b'));

@@ -4,8 +4,8 @@
  * Run with: node qfcode-parser-tests.js
  */
 
-const { tokenize } = require('./qfcode-lexer.js');
-const { parse, ParseError } = require('./qfcode-parser.js');
+const { tokenize } = require('../qfcode-lexer.js');
+const { parse, ParseError } = require('../qfcode-parser.js');
 
 let passed = 0;
 let failed = 0;
@@ -49,8 +49,8 @@ function stmt(source) {
 }
 
 function expr(source) {
-  // Wrap in a PRINT() to get an expression parse
-  const s = stmt(`PRINT(${source})`);
+  // Wrap in a WRITELN() to get an expression parse
+  const s = stmt(`WRITELN(${source})`);
   return s.args[0];
 }
 
@@ -179,47 +179,52 @@ console.log('\n§3 Literals');
 console.log('\n§6 Statements');
 
 {
-  // PRINT
-  const s1 = stmt('PRINT("Hello, World!")');
+  // WRITELN / WRITE
+  const s1 = stmt('WRITELN("Hello, World!")');
   assert('PrintStmt type', s1.type === 'PrintStmt');
   assert('PrintStmt single arg', s1.args.length === 1 && s1.args[0].value === 'Hello, World!');
+  assert('WRITELN sets newline true', s1.newline === true);
 
-  const s2 = stmt('PRINT("Score:", score)');
+  const s2 = stmt('WRITELN("Score:", score)');
   assert('PrintStmt two args', s2.args.length === 2);
 
-  const s3 = stmt('PRINT("High score:", MAX_SCORE, "points")');
+  const s3 = stmt('WRITELN("High score:", MAX_SCORE, "points")');
   assert('PrintStmt three args', s3.args.length === 3);
 
-  const s4 = stmt('PRINT("")');
+  const s4 = stmt('WRITELN("")');
   assert('PrintStmt empty string', s4.args[0].value === '');
 
+  const s5 = stmt('WRITE("no newline")');
+  assert('WRITE sets newline false', s5.newline === false);
+  assert('WRITE single arg', s5.args.length === 1 && s5.args[0].value === 'no newline');
+
   // ERASE with no arg
-  const s5 = stmt('ERASE()');
-  assert('EraseStmt no arg', s5.type === 'EraseStmt' && s5.arg === null);
+  const s6 = stmt('ERASE()');
+  assert('EraseStmt no arg', s6.type === 'EraseStmt' && s6.arg === null);
 
   // ERASE with array arg
-  const s6 = stmt('ERASE(scores)');
-  assert('EraseStmt with arg', s6.arg?.type === 'Identifier');
+  const s7 = stmt('ERASE(scores)');
+  assert('EraseStmt with arg', s7.arg?.type === 'Identifier');
 
   // STOP
-  const s7 = stmt('STOP()');
-  assert('StopStmt', s7.type === 'StopStmt');
+  const s8 = stmt('STOP()');
+  assert('StopStmt', s8.type === 'StopStmt');
 
   // Assignment
-  const s8 = stmt('score = 100');
-  assert('Assign type', s8.type === 'Assign');
-  assert('Assign target is Identifier', s8.target.type === 'Identifier' && s8.target.name === 'SCORE');
-  assert('Assign value is 100', s8.value.value === 100);
+  const s9 = stmt('score = 100');
+  assert('Assign type', s9.type === 'Assign');
+  assert('Assign target is Identifier', s9.target.type === 'Identifier' && s9.target.name === 'SCORE');
+  assert('Assign value is 100', s9.value.value === 100);
 
   // Assignment RHS expression
-  const s9 = stmt('score = score + 10');
-  assert('Assign with expression RHS', s9.value.type === 'BinaryExpr');
+  const s10 = stmt('score = score + 10');
+  assert('Assign with expression RHS', s10.value.type === 'BinaryExpr');
 
   // Array index assignment
-  const s10 = stmt('scores[0] = 99');
-  assert('Index assign type', s10.type === 'Assign');
-  assert('Index assign target is IndexExpr', s10.target.type === 'IndexExpr');
-  assert('Index assign index is 0', s10.target.index.value === 0);
+  const s11 = stmt('scores[0] = 99');
+  assert('Index assign type', s11.type === 'Assign');
+  assert('Index assign target is IndexExpr', s11.target.type === 'IndexExpr');
+  assert('Index assign index is 0', s11.target.index.value === 0);
 }
 
 // ─── §7 Control Flow ─────────────────────────────────────────────────────────
@@ -228,7 +233,7 @@ console.log('\n§7 Control Flow');
 
 {
   // IF / THEN / END IF
-  const s1 = stmt('IF score > 100 THEN\n  PRINT("High!")\nEND IF');
+  const s1 = stmt('IF score > 100 THEN\n  WRITELN("High!")\nEND IF');
   assert('IfStmt type', s1.type === 'IfStmt');
   assert('IfStmt 1 branch', s1.branches.length === 1);
   assert('IfStmt condition is >', s1.branches[0].condition.op === '>');
@@ -236,29 +241,29 @@ console.log('\n§7 Control Flow');
   assert('IfStmt no else', s1.elseBody === null);
 
   // IF / ELSE
-  const s2 = stmt('IF score > 100 THEN\n  PRINT("High!")\nELSE\n  PRINT("Low!")\nEND IF');
+  const s2 = stmt('IF score > 100 THEN\n  WRITELN("High!")\nELSE\n  WRITELN("Low!")\nEND IF');
   assert('IfStmt with ELSE', s2.elseBody !== null && s2.elseBody.length === 1);
 
   // IF / ELSE IF / ELSE
   const src3 = `IF score >= 90 THEN
-  PRINT("A")
+  WRITELN("A")
 ELSE IF score >= 80 THEN
-  PRINT("B")
+  WRITELN("B")
 ELSE
-  PRINT("C")
+  WRITELN("C")
 END IF`;
   const s3 = stmt(src3);
   assert('IfStmt ELSE IF — 2 branches', s3.branches.length === 2);
   assert('IfStmt ELSE IF has else', s3.elseBody !== null);
 
   // WHILE
-  const s4 = stmt('WHILE count <= 10\n  PRINT(count)\nEND WHILE');
+  const s4 = stmt('WHILE count <= 10\n  WRITELN(count)\nEND WHILE');
   assert('WhileStmt type', s4.type === 'WhileStmt');
   assert('WhileStmt condition', s4.condition.op === '<=');
   assert('WhileStmt body', s4.body.length === 1);
 
   // FOR / TO
-  const s5 = stmt('FOR i = 1 TO 10\n  PRINT(i)\nEND FOR');
+  const s5 = stmt('FOR i = 1 TO 10\n  WRITELN(i)\nEND FOR');
   assert('ForStmt type', s5.type === 'ForStmt');
   assert('ForStmt variable', s5.variable === 'I');
   assert('ForStmt from', s5.from.value === 1);
@@ -266,15 +271,15 @@ END IF`;
   assert('ForStmt no step', s5.step === null);
 
   // FOR / TO / STEP
-  const s6 = stmt('FOR i = 0 TO 100 STEP 10\n  PRINT(i)\nEND FOR');
+  const s6 = stmt('FOR i = 0 TO 100 STEP 10\n  WRITELN(i)\nEND FOR');
   assert('ForStmt with STEP', s6.step?.value === 10);
 
   // FOR / TO / STEP negative
-  const s7 = stmt('FOR i = 10 TO 1 STEP -1\n  PRINT(i)\nEND FOR');
+  const s7 = stmt('FOR i = 10 TO 1 STEP -1\n  WRITELN(i)\nEND FOR');
   assert('ForStmt STEP -1 is UnaryExpr', s7.step?.type === 'UnaryExpr');
 
   // FOR EACH
-  const s8 = stmt('FOR EACH name IN names\n  PRINT(name)\nEND FOR');
+  const s8 = stmt('FOR EACH name IN names\n  WRITELN(name)\nEND FOR');
   assert('ForEachStmt type', s8.type === 'ForEachStmt');
   assert('ForEachStmt variable', s8.variable === 'NAME');
   assert('ForEachStmt iterable', s8.iterable.name === 'NAMES');
@@ -300,9 +305,9 @@ END FOR`;
   // MATCH / WHEN / END MATCH
   const matchSrc = `MATCH score
   WHEN 100
-    PRINT("Perfect!")
+    WRITELN("Perfect!")
   WHEN ELSE
-    PRINT("Keep trying!")
+    WRITELN("Keep trying!")
 END MATCH`;
   const s11 = stmt(matchSrc);
   assert('MatchStmt type', s11.type === 'MatchStmt');
@@ -314,7 +319,7 @@ END MATCH`;
   // MATCH with range
   const matchRangeSrc = `MATCH score
   WHEN 90 TO 99
-    PRINT("Excellent!")
+    WRITELN("Excellent!")
 END MATCH`;
   const s12 = stmt(matchRangeSrc);
   assert('MatchStmt range when', s12.whens[0].range !== null);
@@ -325,7 +330,7 @@ END MATCH`;
   const matchStackSrc = `MATCH day
   WHEN "Saturday"
   WHEN "Sunday"
-    PRINT("Weekend!")
+    WRITELN("Weekend!")
 END MATCH`;
   const s13 = stmt(matchStackSrc);
   assert('MatchStmt stacked WHENs produce 1 WhenClause', s13.whens.length === 1);
@@ -338,14 +343,14 @@ console.log('\n§8 Functions');
 
 {
   // FUNCTION definition
-  const s1 = stmt('FUNCTION Greet(name)\n  PRINT("Hello, " + name)\nEND FUNCTION');
+  const s1 = stmt('FUNCTION Greet(name)\n  WRITELN("Hello, " + name)\nEND FUNCTION');
   assert('FunctionDecl type', s1.type === 'FunctionDecl');
   assert('FunctionDecl name', s1.name === 'GREET');
   assert('FunctionDecl params', s1.params.length === 1 && s1.params[0] === 'NAME');
   assert('FunctionDecl body', s1.body.length === 1);
 
   // No params
-  const s2 = stmt('FUNCTION ShowHeader()\n  PRINT("===")\nEND FUNCTION');
+  const s2 = stmt('FUNCTION ShowHeader()\n  WRITELN("===")\nEND FUNCTION');
   assert('FunctionDecl no params', s2.params.length === 0);
 
   // Multiple params
@@ -382,7 +387,7 @@ console.log('\n§10 Error Handling');
   const src1 = `ATTEMPT
   VAR age = NUM(INPUT("Age: "))
 ERROR
-  PRINT("Not a number.")
+  WRITELN("Not a number.")
 END ATTEMPT`;
   const s1 = stmt(src1);
   assert('AttemptStmt type', s1.type === 'AttemptStmt');
@@ -394,7 +399,7 @@ END ATTEMPT`;
   const src2 = `ATTEMPT
   VAR age = NUM(INPUT("Age: "))
 ERROR message
-  PRINT("Problem:", message)
+  WRITELN("Problem:", message)
 END ATTEMPT`;
   const s2 = stmt(src2);
   assert('AttemptStmt with errorVar', s2.errorVar === 'MESSAGE');
@@ -491,9 +496,9 @@ VAR score = 0
 VAR player = ""
 
 FUNCTION ShowHeader()
-    PRINT("================")
-    PRINT(" " + APP_NAME)
-    PRINT("================")
+    WRITELN("================")
+    WRITELN(" " + APP_NAME)
+    WRITELN("================")
 END FUNCTION
 
 FUNCTION AddScore(points)
@@ -505,9 +510,9 @@ END FUNCTION
 
 ShowHeader()
 player = INPUT("Enter your name: ")
-PRINT("Welcome,", player)
+WRITELN("Welcome,", player)
 AddScore(10)
-PRINT("Score:", score)`;
+WRITELN("Score:", score)`;
 
   let tree;
   try {
@@ -533,22 +538,22 @@ console.log('\n§ Parse errors');
 
 {
   assertParseError('IF without THEN raises ParseError',
-    'IF score > 100\n  PRINT("hi")\nEND IF');
+    'IF score > 100\n  WRITELN("hi")\nEND IF');
 
   assertParseError('IF without END IF raises ParseError',
-    'IF score > 100 THEN\n  PRINT("hi")');
+    'IF score > 100 THEN\n  WRITELN("hi")');
 
   assertParseError('WHILE without END WHILE raises ParseError',
-    'WHILE TRUE\n  PRINT("x")');
+    'WHILE TRUE\n  WRITELN("x")');
 
   assertParseError('FUNCTION without END FUNCTION raises ParseError',
-    'FUNCTION Foo()\n  PRINT("x")');
+    'FUNCTION Foo()\n  WRITELN("x")');
 
   assertParseError('Unclosed parenthesis raises ParseError',
-    'PRINT("hi"');
+    'WRITELN("hi"');
 
   assertParseError('FOR without END FOR raises ParseError',
-    'FOR i = 1 TO 10\n  PRINT(i)');
+    'FOR i = 1 TO 10\n  WRITELN(i)');
 
   assertParseError('CONST without value raises ParseError',
     'CONST X');
@@ -562,7 +567,7 @@ console.log('\n§ Nested structures');
   const nestedSrc = `WHILE TRUE
   VAR answer = INPUT("Guess: ")
   IF answer == "42" THEN
-    PRINT("Correct!")
+    WRITELN("Correct!")
     BREAK
   END IF
 END WHILE`;
@@ -603,7 +608,7 @@ console.log('\n§ Line numbers');
 {
   const src = `VAR x = 1
 VAR y = 2
-PRINT(x + y)`;
+WRITELN(x + y)`;
   const b = body(src);
   assert('VarDecl x on line 1', b[0].line === 1);
   assert('VarDecl y on line 2', b[1].line === 2);
