@@ -1,4 +1,16 @@
 /**
+ * QF CODE — Bundled Lexer + Parser + Evaluator
+ * Single-file, dependency-free reference implementation for embedding QF Code
+ * outside the browser IDE shell (shell/qfcode.html). No module system assumed —
+ * classes and functions are defined at script/global scope, same as a plain
+ * <script> tag. For Node usage, prefer the split modules (qfcode-lexer.js,
+ * qfcode-parser.js, qfcode-evaluator.js), which export via module.exports.
+ *
+ * Generated from the same source as shell/qfcode.html's interpreter — see
+ * that file's Lexer/Parser/Evaluator sections for the canonical version.
+ */
+
+/**
  * QF CODE Lexer
  * Tokenizes QF CODE source into a flat array of typed tokens.
  * 
@@ -42,7 +54,8 @@ const SINGLE_KEYWORDS = new Set([
   'ATTEMPT', 'ERROR', 'SIGNAL',
   'TRUE', 'FALSE', 'EMPTY',
   'AND', 'OR', 'NOT', 'XOR',
-  'PRINT', 'INPUT', 'ERASE', 'STOP',
+  'WRITE', 'WRITELN', 'INPUT', 'ERASE', 'STOP',
+  'SOUND', 'BELL',
   'STR', 'NUM', 'BOOL',
   'LENGTH', 'APPEND', 'REMOVE', 'INSERT', 'CONTAINS', 'REVERSE', 'SORT',
   'ABS', 'POW', 'ROUND', 'FLOOR', 'CEILING', 'SQRT', 'MIN', 'MAX',
@@ -298,41 +311,95 @@ function tokenize(source) {
     const startCol = col();
 
     // Comment vs integer-division disambiguation:
-    // Rule: "//" is a COMMENT if and only if it appears where a new statement token
-    // could start — i.e., no meaningful expression token has been seen yet on this line.
-    // "//" after a meaningful token on the same line is always INTEGER DIVISION.
     //
-    // This maps cleanly to user expectations:
-    //   // comment at line start       → comment
-    //   PRINT("x") // inline comment   → comment (PRINT closes expression; // starts comment)
-    //   7 // 2                         → integer division (7 is a meaningful token)
-    //   a // b                         → integer division (a is a meaningful token)
+    // "//" has two meanings in QF Code: comment (to end of line) and integer division.
     //
-    // Inline comment after a closing ) or ] or identifier: the ) / ] closes the
-    // expression and the // is then at a "comment-start" position — but meaningfulOnLine
-    // is true. We resolve by also checking if the char immediately after // is a space
-    // AND looking at whether the prior token was a "closing" token (IDENTIFIER, NUMBER,
-    // STRING, or closing bracket). If meaningful AND immediately after // is a space,
-    // we need to distinguish division from comment.
+    // Cases where // is ALWAYS a comment:
+    //   (a) !meaningfulOnLine — nothing on this line yet (line-start comment)
+    //   (b) last token was STRING, ')', or ']' — these close an expression cleanly,
+    //       and // can only be a comment after them (strings and closed calls can't
+    //       be the left side of a division that a user would write)
     //
-    // FINAL RULE: // is a COMMENT when:
-    //   (a) !meaningfulOnLine (line start comment), OR
-    //   (b) meaningfulOnLine AND the // is followed by end-of-line / EOF /
-    //       or the text that follows cannot be a valid numeric/identifier operand
-    //       (we check: after stripping spaces, is there a number or identifier? if yes,
-    //        it MIGHT be division — but if the prior closing token was ) ] STRING,
-    //        then it's more likely a comment. We use a simple heuristic: if the last
-    //        meaningful token was ) or ] or a STRING, treat // as a comment).
+    // Cases where // might be division — last token was NUMBER or IDENTIFIER:
+    //   7 // 2          → division  (digit after //)
+    //   x // y          → division  (identifier after //)
+    //   RETURN 42 // comment  → comment  (reserved non-expression keyword after //)
     //
-    // This handles the common cases correctly. Edge case (x) // y — ambiguous in the
-    // spec; we emit it as a comment, which is more beginner-friendly.
+    // To distinguish, we peek past the // and any spaces to see what follows:
+    //   - digit or '-' or '('  → DIVISION
+    //   - identifier/keyword word → read it; if it's a plain IDENTIFIER (not reserved)
+    //     or an expression-start keyword (TRUE/FALSE/NOT/builtins) → DIVISION;
+    //     otherwise (reserved keyword that can't start an expression) → COMMENT
+    //   - newline / EOF / anything else → COMMENT
     if (ch === '/' && peek(1) === '/') {
       const lastTok = tokens[tokens.length - 1];
-      const lastIsClosingOrValue = lastTok && (
-        lastTok.type === 'STRING' ||
-        (lastTok.type === 'OPERATOR' && (lastTok.value === ')' || lastTok.value === ']'))
-      );
-      const isComment = !meaningfulOnLine || lastIsClosingOrValue;
+      let isComment;
+
+      if (!meaningfulOnLine) {
+        // Nothing meaningful on line yet → always a comment
+        isComment = true;
+      } else if (!lastTok || lastTok.type === 'STRING' || lastTok.type === 'KEYWORD') {
+        // After a string or a keyword (TRUE/FALSE/EMPTY/etc.) → comment
+        isComment = true;
+      } else if (lastTok.type === 'OPERATOR' &&
+                 (lastTok.value === ')' || lastTok.value === ']')) {
+        // After a closing bracket → comment
+        isComment = true;
+      } else {
+        // Last token was NUMBER or IDENTIFIER — peek past // to decide.
+        let p = pos + 2;
+        while (p < source.length && (source[p] === ' ' || source[p] === '\t')) p++;
+        const nc = source[p];
+
+        if (nc === undefined || nc === '\n') {
+          isComment = true;  // nothing follows // → comment
+        } else if ((nc >= '0' && nc <= '9') || nc === '-' || nc === '(') {
+          // Digit, unary minus, or open-paren → clearly a division operand
+          isComment = false;
+        } else if ((nc >= 'a' && nc <= 'z') || (nc >= 'A' && nc <= 'Z') || nc === '_') {
+          // Read the word that follows //
+          let word = '', q = p;
+          while (q < source.length && (
+            (source[q] >= 'a' && source[q] <= 'z') ||
+            (source[q] >= 'A' && source[q] <= 'Z') ||
+            (source[q] >= '0' && source[q] <= '9') || source[q] === '_')) {
+            word += source[q++];
+          }
+          const upper = word.toUpperCase();
+
+          if (lastTok.type === 'NUMBER') {
+            // After a number literal, // is division ONLY if the RHS starts with a digit,
+            // '-', or '(' (handled above). A word after a number-literal // is always a
+            // comment — "RETURN 42 // note" and "VAR x = 10 // init" are comments.
+            // Trade-off: "42 // myVar" is ambiguous; we choose comment (more common intent).
+            isComment = true;
+          } else {
+            // After an IDENTIFIER: "x // y" is division (identifier RHS),
+            // but "x // THIS" is a comment (reserved non-expression keyword).
+            if (!SINGLE_KEYWORDS.has(upper)) {
+              // Plain identifier → x // y → division
+              isComment = false;
+            } else {
+              // Reserved keyword — is it one that can validly start an expression?
+              const EXPR_START_KW = new Set([
+                'TRUE', 'FALSE', 'EMPTY', 'NOT',
+                'STR', 'NUM', 'BOOL',
+                'LENGTH', 'APPEND', 'REMOVE', 'INSERT', 'CONTAINS', 'REVERSE', 'SORT',
+                'ABS', 'POW', 'ROUND', 'FLOOR', 'CEILING', 'SQRT', 'MIN', 'MAX',
+                'RANDOM', 'RANDOMINT',
+                'UPPER', 'LOWER', 'TRIM', 'REPLACE', 'SPLIT', 'SUBSTRING',
+                'STARTSWITH', 'ENDSWITH',
+                'ISNUMBER', 'ISSTRING', 'ISBOOL', 'ISEMPTY', 'ISARRAY', 'ARRAY',
+                'INPUT', 'WRITE', 'WRITELN', 'LAST_ERROR', 'SOUND', 'BELL',
+              ]);
+              isComment = !EXPR_START_KW.has(upper);
+            }
+          }
+        } else {
+          isComment = true; // any other character after // → comment
+        }
+      }
+
       if (isComment) {
         advance(); advance();
         skipLineComment();
@@ -577,7 +644,8 @@ class Parser {
         case 'RETURN':    return this.parseReturn();
         case 'BREAK':     return this.parseBreak();
         case 'CONTINUE':  return this.parseContinue();
-        case 'PRINT':     return this.parsePrint();
+        case 'WRITE':     return this.parseWrite();
+        case 'WRITELN':   return this.parseWrite();
         case 'ERASE':     return this.parseErase();
         case 'STOP':      return this.parseStop();
         case 'SIGNAL':    return this.parseSignal();
@@ -612,6 +680,8 @@ class Parser {
       'UPPER', 'LOWER', 'TRIM', 'REPLACE', 'SPLIT', 'SUBSTRING',
       'STARTSWITH', 'ENDSWITH',
       'ARRAY',
+      // Sound — always used as statements (side effect, no return value used)
+      'SOUND', 'BELL',
     ].includes(kw);
   }
 
@@ -840,6 +910,13 @@ class Parser {
     if (this.current().type !== 'NEWLINE' && this.current().type !== 'EOF') {
       value = this.parseExpression();
     }
+    // Skip any trailing comment tokens that the lexer may have left as operators
+    // (e.g. `RETURN 42  // comment` — after parsing 42, the // may tokenize as
+    // integer-division operator if the lexer's heuristic didn't catch it).
+    // Discard everything until we reach a NEWLINE or EOF.
+    while (this.current().type !== 'NEWLINE' && this.current().type !== 'EOF') {
+      this.advance();
+    }
     this.expectNewlineOrEOF();
     return this.node('ReturnStmt', { value }, startTok);
   }
@@ -858,10 +935,11 @@ class Parser {
     return this.node('ContinueStmt', {}, tok);
   }
 
-  // ── PRINT ──────────────────────────────────────────────────────────────
+  // ── WRITE / WRITELN ────────────────────────────────────────────────────
 
-  parsePrint() {
-    const startTok = this.advance(); // consume PRINT
+  parseWrite() {
+    const startTok = this.advance(); // consume WRITE or WRITELN
+    const newline = startTok.value === 'WRITELN';
     this.expectOperator('(');
     const args = [];
     if (!this.isOperator(')')) {
@@ -873,7 +951,7 @@ class Parser {
     }
     this.expectOperator(')');
     this.expectNewlineOrEOF();
-    return this.node('PrintStmt', { args }, startTok);
+    return this.node('PrintStmt', { args, newline }, startTok);
   }
 
   // ── ERASE ──────────────────────────────────────────────────────────────
@@ -1177,7 +1255,8 @@ class Parser {
   // All built-in keywords that take () args and return values
   isBuiltinFunction(kw) {
     return [
-      'PRINT', 'INPUT', 'ERASE', 'STOP', 'SIGNAL',
+      'WRITE', 'WRITELN', 'INPUT', 'ERASE', 'STOP', 'SIGNAL',
+      'SOUND', 'BELL',
       'STR', 'NUM', 'BOOL',
       'LENGTH', 'APPEND', 'REMOVE', 'INSERT', 'CONTAINS', 'REVERSE', 'SORT',
       'ABS', 'POW', 'ROUND', 'FLOOR', 'CEILING', 'SQRT', 'MIN', 'MAX',
@@ -1321,11 +1400,35 @@ function displayValue(v) {
   return String(v);
 }
 
+// ─── SOUND — note name to frequency ───────────────────────────────────────────
+// Equal-tempered scale, A4 = 440 Hz. Accepts "C4", "A#3", "Bb5", etc.
+// Returns null if the string isn't a recognizable note name.
+
+const NOTE_SEMITONES_FROM_A = {
+  C: -9, D: -7, E: -5, F: -4, G: -2, A: 0, B: 2,
+};
+
+function noteNameToFrequency(name) {
+  const m = /^([A-Ga-g])([#b♭♯]?)(-?\d{1,2})$/.exec(name.trim());
+  if (!m) return null;
+
+  const letter = m[1].toUpperCase();
+  const accidental = m[2];
+  const octave = parseInt(m[3], 10);
+
+  let semitone = NOTE_SEMITONES_FROM_A[letter];
+  if (accidental === '#' || accidental === '♯') semitone += 1;
+  if (accidental === 'b' || accidental === '♭') semitone -= 1;
+
+  const semitonesFromA4 = semitone + (octave - 4) * 12;
+  return 440 * Math.pow(2, semitonesFromA4 / 12);
+}
+
 // ─── Evaluator ────────────────────────────────────────────────────────────────
 
 class Evaluator {
   /**
-   * @param {{ print: (s:string)=>void, erase: ()=>void, input: (prompt:string)=>Promise<string> }} io
+   * @param {{ print: (s:string)=>void, erase: ()=>void, input: (prompt:string)=>Promise<string>, sound: (freq:number, durationMs:number)=>Promise<void> }} io
    */
   constructor(io) {
     this.io = io;
@@ -1333,7 +1436,14 @@ class Evaluator {
     this.functionDefs = Object.create(null); // name → FunctionDecl node
     this.callDepth = 0;
     this.MAX_CALL_DEPTH = 500;
-    this.MAX_ITERATIONS = 1_000_000;
+    // Browser-safety limits. These are deliberately generous for a teaching
+    // language, but low enough to stop an accidental endless loop before it
+    // can monopolize the tab or create an enormous output DOM.
+    this.MAX_ITERATIONS = 10_000;
+    this.MAX_EXECUTION_STEPS = 100_000;
+    this.YIELD_EVERY_STEPS = 100;
+    this.executionSteps = 0;
+    this.stopRequested = false;
 
     // LAST_ERROR object — always available
     this.lastError = { MESSAGE: '', LINE: 0, CODE: '' };
@@ -1351,6 +1461,35 @@ class Evaluator {
     this.lastError.MESSAGE = message;
     this.lastError.LINE    = line;
     this.lastError.CODE    = code;
+  }
+
+  // ── Cooperative execution guard ───────────────────────────────────────────
+  // Ported from the gibiddapress.com QF Code 1.1 build (2026-08-02 reconciliation).
+  // Runs once per executed statement (via execBlock) and once per loop
+  // iteration (WHILE/FOR/FOR EACH). A pure iteration cap on loops alone isn't
+  // enough — a long-running FUNCTION with no loop, or a chain of nested
+  // blocks, can still lock up the tab — so this counts total *statements*
+  // executed, not just loop turns.
+
+  async checkpoint(line = 0) {
+    if (this.stopRequested) throw new StopSignal();
+
+    this.executionSteps++;
+    if (this.executionSteps > this.MAX_EXECUTION_STEPS) {
+      throw new QFError(
+        `Program stopped after ${this.MAX_EXECUTION_STEPS.toLocaleString()} execution steps to keep the browser responsive. Check for a loop or function that never finishes.`,
+        line
+      );
+    }
+
+    // Awaiting an already-resolved promise only yields to the microtask
+    // queue, which can still starve painting and button clicks. A
+    // zero-delay timer yields to the browser's actual event loop, so Stop
+    // and the rest of the UI remain responsive while a program runs.
+    if (this.executionSteps % this.YIELD_EVERY_STEPS === 0) {
+      await new Promise(resolve => setTimeout(resolve, 0));
+      if (this.stopRequested) throw new StopSignal();
+    }
   }
 
   // ── Entry point ────────────────────────────────────────────────────────────
@@ -1374,6 +1513,7 @@ class Evaluator {
   async execBlock(stmts, env, resetErrors = true) {
     for (const stmt of stmts) {
       if (stmt.type === 'FunctionDecl') continue; // already registered
+      await this.checkpoint(stmt.line);
       if (resetErrors) this.resetLastError();
       await this.execStmt(stmt, env);
     }
@@ -1438,7 +1578,7 @@ class Evaluator {
     }
   }
 
-  // ── PRINT ──────────────────────────────────────────────────────────────────
+  // ── WRITE / WRITELN ────────────────────────────────────────────────────────
 
   async execPrint(node, env) {
     const parts = [];
@@ -1446,7 +1586,13 @@ class Evaluator {
       const v = await this.evalExpr(arg, env);
       parts.push(displayValue(v));
     }
-    this.io.print(parts.join(' '));
+    // node.newline === true  → WRITELN: append newline (default io.print behaviour)
+    // node.newline === false → WRITE:   no newline, append to current line
+    if (node.newline === false) {
+      this.io.write(parts.join(' '));
+    } else {
+      this.io.print(parts.join(' '));
+    }
   }
 
   // ── ERASE ──────────────────────────────────────────────────────────────────
@@ -1497,11 +1643,15 @@ class Evaluator {
   async execWhile(node, env) {
     let iterations = 0;
     while (true) {
-      if (++iterations > this.MAX_ITERATIONS) {
-        throw new QFError(`Infinite loop detected — WHILE ran more than ${this.MAX_ITERATIONS.toLocaleString()} times.`, node.line);
-      }
+      await this.checkpoint(node.line);
       const cond = await this.evalExpr(node.condition, env);
       if (!this.isTruthy(cond, node.condition.line)) break;
+      if (++iterations > this.MAX_ITERATIONS) {
+        throw new QFError(
+          `This WHILE loop was stopped after ${this.MAX_ITERATIONS.toLocaleString()} iterations to keep the browser responsive. Its condition may never become FALSE. Check that something inside the loop changes a value used by the condition.`,
+          node.line
+        );
+      }
       try {
         await this.execBlock(node.body, env);
       } catch (e) {
@@ -1534,8 +1684,12 @@ class Evaluator {
     try {
       let i = from;
       while (step > 0 ? i <= to : i >= to) {
+        await this.checkpoint(node.line);
         if (++iterations > this.MAX_ITERATIONS) {
-          throw new QFError(`FOR loop ran more than ${this.MAX_ITERATIONS.toLocaleString()} times.`, node.line);
+          throw new QFError(
+            `This FOR loop was stopped after ${this.MAX_ITERATIONS.toLocaleString()} iterations to keep the browser responsive. Use a smaller range or a larger STEP value.`,
+            node.line
+          );
         }
         env.vars[varName].value = i;
         try {
@@ -1565,6 +1719,7 @@ class Evaluator {
 
     try {
       for (const item of iterable) {
+        await this.checkpoint(node.line);
         env.vars[varName].value = item;
         try {
           await this.execBlock(node.body, env);
@@ -1938,7 +2093,7 @@ class Evaluator {
   // ── STOP special handling ─────────────────────────────────────────────────
 
   // STOP() is handled as a statement; if it appears as an expression
-  // (e.g. inside a PRINT) we handle it here.
+  // (e.g. inside a WRITELN) we handle it here.
   // We throw a special StopSignal that halts the program.
 
   // ── Built-in functions ────────────────────────────────────────────────────
@@ -1961,9 +2116,15 @@ class Evaluator {
 
       // ── I/O ─────────────────────────────────────────────────────────────
 
-      case 'PRINT': {
+      case 'WRITELN': {
         const vals = await evalArgs();
         this.io.print(vals.map(displayValue).join(' '));
+        return EMPTY;
+      }
+
+      case 'WRITE': {
+        const vals = await evalArgs();
+        this.io.write(vals.map(displayValue).join(' '));
         return EMPTY;
       }
 
@@ -1988,6 +2149,37 @@ class Evaluator {
 
       case 'STOP': {
         throw new StopSignal();
+      }
+
+      // ── Sound ───────────────────────────────────────────────────────────
+
+      case 'SOUND': {
+        if (argc !== 2) throw new QFError(`SOUND() requires exactly 2 arguments: a pitch and a duration in milliseconds. Example: SOUND("C4", 300) or SOUND(440, 300).`, line);
+        const [pitch, duration] = await evalArgs();
+
+        let freq;
+        if (typeof pitch === 'number') {
+          if (!(pitch > 0)) throw new QFError(`SOUND() frequency must be a positive number of Hz, got ${displayValue(pitch)}.`, line);
+          freq = pitch;
+        } else if (typeof pitch === 'string') {
+          freq = noteNameToFrequency(pitch);
+          if (freq === null) throw new QFError(`"${pitch}" isn't a note SOUND() understands. Tip: use a note name like "C4" or "A#3", or a frequency in Hz like 440.`, line);
+        } else {
+          throw new QFError(`SOUND()'s first argument must be a number (Hz) or a note name like "C4", got ${typeOf(pitch)}.`, line);
+        }
+
+        if (typeof duration !== 'number' || !(duration > 0)) {
+          throw new QFError(`SOUND()'s second argument must be a positive number of milliseconds, got ${displayValue(duration)}.`, line);
+        }
+
+        await this.io.sound(freq, duration);
+        return EMPTY;
+      }
+
+      case 'BELL': {
+        if (argc !== 0) throw new QFError(`BELL() takes no arguments. Did you mean SOUND(pitch, duration)?`, line);
+        await this.io.sound(880, 150);
+        return EMPTY;
       }
 
       // ── Type conversion ──────────────────────────────────────────────────

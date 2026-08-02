@@ -115,11 +115,35 @@ function displayValue(v) {
   return String(v);
 }
 
+// ─── SOUND — note name to frequency ───────────────────────────────────────────
+// Equal-tempered scale, A4 = 440 Hz. Accepts "C4", "A#3", "Bb5", etc.
+// Returns null if the string isn't a recognizable note name.
+
+const NOTE_SEMITONES_FROM_A = {
+  C: -9, D: -7, E: -5, F: -4, G: -2, A: 0, B: 2,
+};
+
+function noteNameToFrequency(name) {
+  const m = /^([A-Ga-g])([#b♭♯]?)(-?\d{1,2})$/.exec(name.trim());
+  if (!m) return null;
+
+  const letter = m[1].toUpperCase();
+  const accidental = m[2];
+  const octave = parseInt(m[3], 10);
+
+  let semitone = NOTE_SEMITONES_FROM_A[letter];
+  if (accidental === '#' || accidental === '♯') semitone += 1;
+  if (accidental === 'b' || accidental === '♭') semitone -= 1;
+
+  const semitonesFromA4 = semitone + (octave - 4) * 12;
+  return 440 * Math.pow(2, semitonesFromA4 / 12);
+}
+
 // ─── Evaluator ────────────────────────────────────────────────────────────────
 
 class Evaluator {
   /**
-   * @param {{ print: (s:string)=>void, erase: ()=>void, input: (prompt:string)=>Promise<string> }} io
+   * @param {{ print: (s:string)=>void, erase: ()=>void, input: (prompt:string)=>Promise<string>, sound: (freq:number, durationMs:number)=>Promise<void> }} io
    */
   constructor(io) {
     this.io = io;
@@ -127,7 +151,14 @@ class Evaluator {
     this.functionDefs = Object.create(null); // name → FunctionDecl node
     this.callDepth = 0;
     this.MAX_CALL_DEPTH = 500;
-    this.MAX_ITERATIONS = 1_000_000;
+    // Browser-safety limits. These are deliberately generous for a teaching
+    // language, but low enough to stop an accidental endless loop before it
+    // can monopolize the tab or create an enormous output DOM.
+    this.MAX_ITERATIONS = 10_000;
+    this.MAX_EXECUTION_STEPS = 100_000;
+    this.YIELD_EVERY_STEPS = 100;
+    this.executionSteps = 0;
+    this.stopRequested = false;
 
     // LAST_ERROR object — always available
     this.lastError = { MESSAGE: '', LINE: 0, CODE: '' };
@@ -145,6 +176,35 @@ class Evaluator {
     this.lastError.MESSAGE = message;
     this.lastError.LINE    = line;
     this.lastError.CODE    = code;
+  }
+
+  // ── Cooperative execution guard ───────────────────────────────────────────
+  // Ported from the gibiddapress.com QF Code 1.1 build (2026-08-02 reconciliation).
+  // Runs once per executed statement (via execBlock) and once per loop
+  // iteration (WHILE/FOR/FOR EACH). A pure iteration cap on loops alone isn't
+  // enough — a long-running FUNCTION with no loop, or a chain of nested
+  // blocks, can still lock up the tab — so this counts total *statements*
+  // executed, not just loop turns.
+
+  async checkpoint(line = 0) {
+    if (this.stopRequested) throw new StopSignal();
+
+    this.executionSteps++;
+    if (this.executionSteps > this.MAX_EXECUTION_STEPS) {
+      throw new QFError(
+        `Program stopped after ${this.MAX_EXECUTION_STEPS.toLocaleString()} execution steps to keep the browser responsive. Check for a loop or function that never finishes.`,
+        line
+      );
+    }
+
+    // Awaiting an already-resolved promise only yields to the microtask
+    // queue, which can still starve painting and button clicks. A
+    // zero-delay timer yields to the browser's actual event loop, so Stop
+    // and the rest of the UI remain responsive while a program runs.
+    if (this.executionSteps % this.YIELD_EVERY_STEPS === 0) {
+      await new Promise(resolve => setTimeout(resolve, 0));
+      if (this.stopRequested) throw new StopSignal();
+    }
   }
 
   // ── Entry point ────────────────────────────────────────────────────────────
@@ -168,6 +228,7 @@ class Evaluator {
   async execBlock(stmts, env, resetErrors = true) {
     for (const stmt of stmts) {
       if (stmt.type === 'FunctionDecl') continue; // already registered
+      await this.checkpoint(stmt.line);
       if (resetErrors) this.resetLastError();
       await this.execStmt(stmt, env);
     }
@@ -232,7 +293,7 @@ class Evaluator {
     }
   }
 
-  // ── PRINT ──────────────────────────────────────────────────────────────────
+  // ── WRITE / WRITELN ────────────────────────────────────────────────────────
 
   async execPrint(node, env) {
     const parts = [];
@@ -240,7 +301,13 @@ class Evaluator {
       const v = await this.evalExpr(arg, env);
       parts.push(displayValue(v));
     }
-    this.io.print(parts.join(' '));
+    // node.newline === true  → WRITELN: append newline (default io.print behaviour)
+    // node.newline === false → WRITE:   no newline, append to current line
+    if (node.newline === false) {
+      this.io.write(parts.join(' '));
+    } else {
+      this.io.print(parts.join(' '));
+    }
   }
 
   // ── ERASE ──────────────────────────────────────────────────────────────────
@@ -291,11 +358,15 @@ class Evaluator {
   async execWhile(node, env) {
     let iterations = 0;
     while (true) {
-      if (++iterations > this.MAX_ITERATIONS) {
-        throw new QFError(`Infinite loop detected — WHILE ran more than ${this.MAX_ITERATIONS.toLocaleString()} times.`, node.line);
-      }
+      await this.checkpoint(node.line);
       const cond = await this.evalExpr(node.condition, env);
       if (!this.isTruthy(cond, node.condition.line)) break;
+      if (++iterations > this.MAX_ITERATIONS) {
+        throw new QFError(
+          `This WHILE loop was stopped after ${this.MAX_ITERATIONS.toLocaleString()} iterations to keep the browser responsive. Its condition may never become FALSE. Check that something inside the loop changes a value used by the condition.`,
+          node.line
+        );
+      }
       try {
         await this.execBlock(node.body, env);
       } catch (e) {
@@ -328,8 +399,12 @@ class Evaluator {
     try {
       let i = from;
       while (step > 0 ? i <= to : i >= to) {
+        await this.checkpoint(node.line);
         if (++iterations > this.MAX_ITERATIONS) {
-          throw new QFError(`FOR loop ran more than ${this.MAX_ITERATIONS.toLocaleString()} times.`, node.line);
+          throw new QFError(
+            `This FOR loop was stopped after ${this.MAX_ITERATIONS.toLocaleString()} iterations to keep the browser responsive. Use a smaller range or a larger STEP value.`,
+            node.line
+          );
         }
         env.vars[varName].value = i;
         try {
@@ -359,6 +434,7 @@ class Evaluator {
 
     try {
       for (const item of iterable) {
+        await this.checkpoint(node.line);
         env.vars[varName].value = item;
         try {
           await this.execBlock(node.body, env);
@@ -732,7 +808,7 @@ class Evaluator {
   // ── STOP special handling ─────────────────────────────────────────────────
 
   // STOP() is handled as a statement; if it appears as an expression
-  // (e.g. inside a PRINT) we handle it here.
+  // (e.g. inside a WRITELN) we handle it here.
   // We throw a special StopSignal that halts the program.
 
   // ── Built-in functions ────────────────────────────────────────────────────
@@ -755,9 +831,15 @@ class Evaluator {
 
       // ── I/O ─────────────────────────────────────────────────────────────
 
-      case 'PRINT': {
+      case 'WRITELN': {
         const vals = await evalArgs();
         this.io.print(vals.map(displayValue).join(' '));
+        return EMPTY;
+      }
+
+      case 'WRITE': {
+        const vals = await evalArgs();
+        this.io.write(vals.map(displayValue).join(' '));
         return EMPTY;
       }
 
@@ -782,6 +864,37 @@ class Evaluator {
 
       case 'STOP': {
         throw new StopSignal();
+      }
+
+      // ── Sound ───────────────────────────────────────────────────────────
+
+      case 'SOUND': {
+        if (argc !== 2) throw new QFError(`SOUND() requires exactly 2 arguments: a pitch and a duration in milliseconds. Example: SOUND("C4", 300) or SOUND(440, 300).`, line);
+        const [pitch, duration] = await evalArgs();
+
+        let freq;
+        if (typeof pitch === 'number') {
+          if (!(pitch > 0)) throw new QFError(`SOUND() frequency must be a positive number of Hz, got ${displayValue(pitch)}.`, line);
+          freq = pitch;
+        } else if (typeof pitch === 'string') {
+          freq = noteNameToFrequency(pitch);
+          if (freq === null) throw new QFError(`"${pitch}" isn't a note SOUND() understands. Tip: use a note name like "C4" or "A#3", or a frequency in Hz like 440.`, line);
+        } else {
+          throw new QFError(`SOUND()'s first argument must be a number (Hz) or a note name like "C4", got ${typeOf(pitch)}.`, line);
+        }
+
+        if (typeof duration !== 'number' || !(duration > 0)) {
+          throw new QFError(`SOUND()'s second argument must be a positive number of milliseconds, got ${displayValue(duration)}.`, line);
+        }
+
+        await this.io.sound(freq, duration);
+        return EMPTY;
+      }
+
+      case 'BELL': {
+        if (argc !== 0) throw new QFError(`BELL() takes no arguments. Did you mean SOUND(pitch, duration)?`, line);
+        await this.io.sound(880, 150);
+        return EMPTY;
       }
 
       // ── Type conversion ──────────────────────────────────────────────────

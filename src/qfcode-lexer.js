@@ -43,6 +43,7 @@ const SINGLE_KEYWORDS = new Set([
   'TRUE', 'FALSE', 'EMPTY',
   'AND', 'OR', 'NOT', 'XOR',
   'WRITE', 'WRITELN', 'INPUT', 'ERASE', 'STOP',
+  'SOUND', 'BELL',
   'STR', 'NUM', 'BOOL',
   'LENGTH', 'APPEND', 'REMOVE', 'INSERT', 'CONTAINS', 'REVERSE', 'SORT',
   'ABS', 'POW', 'ROUND', 'FLOOR', 'CEILING', 'SQRT', 'MIN', 'MAX',
@@ -377,7 +378,7 @@ function tokenize(source) {
                 'UPPER', 'LOWER', 'TRIM', 'REPLACE', 'SPLIT', 'SUBSTRING',
                 'STARTSWITH', 'ENDSWITH',
                 'ISNUMBER', 'ISSTRING', 'ISBOOL', 'ISEMPTY', 'ISARRAY', 'ARRAY',
-                'INPUT', 'WRITE', 'WRITELN', 'LAST_ERROR',
+                'INPUT', 'WRITE', 'WRITELN', 'LAST_ERROR', 'SOUND', 'BELL',
               ]);
               isComment = !EXPR_START_KW.has(upper);
             }
@@ -446,4 +447,10 @@ function tokenize(source) {
 
   tokens.push({ type: 'EOF', value: null, raw: '', line, col: col() });
   return tokens;
+}
+
+// ─── Exports ──────────────────────────────────────────────────────────────────
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { tokenize, LexerError };
 }
